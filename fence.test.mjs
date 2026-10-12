@@ -44,8 +44,17 @@ const mainCases = [
   ['Write', { file_path: '/home/x/code/some-repo/src/x.ts' }, 'deny'],
   ['Write', { file_path: '/tmp/../tmp/sahar-escape.md' }, 'deny'],
   ['NotebookEdit', {}, 'deny'],
+  ['mcp__mind__ask_mind', { query: 'x' }, 'allow'],                  // her brain: main thread only
+  ['mcp__mind__remember', { text: 'x' }, 'allow'],
+  ['mcp__mind__save_knowledge', { filename: 'a.md', markdown: 'x' }, 'allow'],
+  ['mcp__other__thing', {}, 'deny'],
 ];
 let bad = 0;
+// Workers do not get the mind tools.
+for (const t of ['mcp__mind__ask_mind', 'mcp__mind__remember', 'mcp__mind__save_knowledge']) {
+  const out = await fenceHook('go')({ tool_name: t, tool_input: {}, agent_id: 'w1' });
+  if (out?.hookSpecificOutput?.permissionDecision !== 'deny') { bad++; console.log(`MISMATCH worker may not call ${t}`); }
+}
 // TrueMemory is required: not connected is a setup item with a one-line fix.
 if (!/not connected/.test(tmSetupLine(false)) || !/Connect TrueMemory/.test(tmSetupLine(false)) || !/connected/.test(tmSetupLine(true))) { bad++; console.log('MISMATCH tm setup line'); }
 // Her eyes (main thread Bash): read-only allowlist.

@@ -6,14 +6,19 @@
   "repository": "github:AbeerAlarean/sahar",
   "description": "Sahar — a chief of staff for a builder's work, on your own Claude Code login.",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server.mjs",
     "install-service": "node scripts/service.mjs install",
     "uninstall-service": "node scripts/service.mjs uninstall",
-    "test": "node fence.test.mjs && node night.test.mjs && node tm.test.mjs && node checks.test.mjs"
+    "seed": "node seed.mjs",
+    "seed:apply": "node seed.mjs --apply",
+    "test": "node fence.test.mjs && node night.test.mjs && node day.test.mjs && node tm.test.mjs && node checks.test.mjs && node seed.test.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.285"
+    "@anthropic-ai/claude-agent-sdk": "0.3.285",
+    "zod": "^4.6.5"
   }
 }

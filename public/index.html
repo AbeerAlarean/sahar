@@ -170,59 +170,15 @@ body::after{content:none;display:none;position:fixed;inset:-20% -10% auto -10%;h
 .pins .more{pointer-events:none}
 /* ═══ main tasks, live — where are we, at a glance ═══ */
 .tasks{flex:none;position:relative;z-index:6;padding:4px 28px 10px}
-.tasks-in{max-width:640px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px}
-.tasks-in::-webkit-scrollbar{display:none}
 .tasks:empty,.tasks-in:empty{display:none}
-.task{flex:1 1 0;min-width:150px;background:var(--card);border:1px solid var(--rule-soft);border-radius:12px;padding:9px 12px 10px;cursor:pointer;text-align:left;font:inherit;color:inherit;position:relative;transition:background .2s,border-color .2s}
-.task:hover{background:var(--card);border-color:var(--rule)}
-.task .tn{display:flex;align-items:center;gap:7px;font-family:var(--serif);font-size:15px;line-height:1.25;font-variation-settings:'opsz' 16}
-.task .tn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.task .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ink-4)}
-.task.moving .dot{background:var(--moss)}
-.task.run .dot{background:var(--moss);box-shadow:0 0 0 0 rgba(85,99,63,.5);animation:beat 1.8s infinite}
-.task.needs .dot,.task.blocked .dot{background:var(--garnet)}
-@keyframes beat{0%{box-shadow:0 0 0 0 rgba(85,99,63,.45)}70%{box-shadow:0 0 0 7px rgba(85,99,63,0)}100%{box-shadow:0 0 0 0 rgba(85,99,63,0)}}
-.track{display:flex;gap:3px;margin-top:8px}
-.track i{flex:1;height:3px;border-radius:2px;background:var(--rule)}
-.track i.on{background:var(--ink-2)}
-.task.needs .track i.on,.task.blocked .track i.on{background:var(--garnet)}
-.task.moving .track i.on,.task.run .track i.on{background:var(--moss)}
-.task .tl{margin-top:5px;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between}
-.task.needs .tl b{color:var(--garnet);font-weight:500}
-.task .tip{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:var(--card);border:1px solid var(--rule);border-radius:10px;box-shadow:var(--shadow);padding:9px 11px;font-family:var(--sans);font-size:12.5px;line-height:1.45;color:var(--ink-2)}
-.task:hover .tip,.task:focus-visible .tip{display:block}
 .note{text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--ink-4);letter-spacing:.06em}
 @media (min-width:1180px){body.pinsopen .tasks{padding-right:420px}}
 @media (max-width:600px){.tasks{padding-left:16px;padding-right:16px}}
 /* livelier: the current stage shimmers while a worker is on it; the card breathes */
-.task.run .track i.cur{background:linear-gradient(90deg,var(--moss) 0%,#a8b88c 50%,var(--moss) 100%);background-size:200% 100%;animation:shimmer 1.4s linear infinite}
-@keyframes shimmer{from{background-position:200% 0}to{background-position:0 0}}
-.task.run{animation:breathe 3.2s ease-in-out infinite}
 @keyframes breathe{0%,100%{border-color:var(--rule-soft)}50%{border-color:rgba(85,99,63,.35)}}
-.task.needs .dot{animation:blink 1.6s ease-in-out infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
-.task{transition:background .2s,border-color .2s,transform .2s}
-.task.changed{animation:pop .6s ease}
 @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.03)}100%{transform:scale(1)}}
-.task .tp{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:999px;margin-bottom:6px;color:var(--pc,var(--ink-3));background:var(--pb,var(--paper-2))}
 /* stronger signals — dots, track and breathing read clearly at a glance */
-.task .dot{width:10px;height:10px;background:#b9b2a6}
-.task.moving .dot{background:#4f7a2e}
-.task.run .dot{background:#4f9a2e;animation:beat2 1.4s infinite}
 @keyframes beat2{0%{box-shadow:0 0 0 0 rgba(79,154,46,.65)}70%{box-shadow:0 0 0 9px rgba(79,154,46,0)}100%{box-shadow:0 0 0 0 rgba(79,154,46,0)}}
-.task.needs .dot,.task.blocked .dot{background:#c0283f}
-.task.needs .dot{animation:blink2 1.1s ease-in-out infinite}
-@keyframes blink2{0%,100%{opacity:1;box-shadow:0 0 0 3px rgba(192,40,63,.18)}50%{opacity:.3;box-shadow:none}}
-.track{gap:4px;margin-top:9px}
-.track i{height:5px;border-radius:3px;background:var(--paper-3)}
-.track i.on{background:#3b3631}
-.task.moving .track i.on,.task.run .track i.on{background:#4f7a2e}
-.task.needs .track i.on,.task.blocked .track i.on{background:#c0283f}
-.task.run .track i.cur{background:linear-gradient(90deg,#4f7a2e 0%,#b6e08f 50%,#4f7a2e 100%);background-size:200% 100%;animation:shimmer 1.1s linear infinite}
-.task.run{animation:breathe2 2.4s ease-in-out infinite;background:var(--card)}
-@keyframes breathe2{0%,100%{border-color:rgba(79,122,46,.25);box-shadow:0 0 0 0 rgba(79,122,46,0)}50%{border-color:rgba(79,122,46,.7);box-shadow:0 0 0 3px rgba(79,122,46,.12)}}
-.task.needs{border-color:rgba(192,40,63,.45)}
-.task .tl{color:var(--ink-2)}
 /* ═══ polish (design pass): calm surfaces, readable type, a strip that reads at a glance ═══ */
 .tally{font-size:17px;line-height:1.6;color:var(--ink)}
 .me .utxt{background:var(--paper-2);color:var(--ink)}
@@ -230,40 +186,6 @@ body::after{content:none;display:none;position:fixed;inset:-20% -10% auto -10%;h
 .mast .time,.act,.hint,.model{color:var(--ink-3)}
 /* the strip: full width, grouped by product, nothing truncated */
 .tasks{padding:6px 16px 12px}
-.tasks-in{max-width:none;display:flex;flex-direction:column;gap:8px}
-.tgroup{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;align-items:stretch}
-.tglabel{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:12px;font-weight:500;color:var(--ink-2);letter-spacing:.01em;margin:2px 2px -2px}
-.tglabel i{width:8px;height:8px;border-radius:2px;background:var(--pc,#8f8a82)}
-.task{min-width:0;background:var(--card);border:1px solid var(--rule-soft);border-radius:10px;padding:10px 12px 11px;box-shadow:0 1px 2px rgba(28,27,25,.04);animation:none}
-.task:hover{border-color:var(--rule);box-shadow:0 2px 8px rgba(28,27,25,.06)}
-.task .tp{display:none}
-.task .tn{align-items:flex-start;font-family:var(--sans);font-size:14px;font-weight:500;line-height:1.35;color:var(--ink)}
-.task .tn span{white-space:normal;overflow:visible;text-overflow:clip}
-.task .dot{width:9px;height:9px;margin-top:4px;background:var(--ink-4)}
-.task.moving .dot{background:var(--moss)}
-.task.run .dot{background:var(--moss);animation:beat2 1.6s infinite}
-.task.needs .dot,.task.blocked .dot{background:var(--garnet)}
-.task.needs .dot{animation:none;box-shadow:0 0 0 3px var(--garnet-soft)}
-.task.run,.task.needs{animation:none}
-.task.run{border-color:rgba(63,122,58,.35)}
-.task.needs{border-color:rgba(176,40,61,.35)}
-.track{gap:3px;margin-top:10px}
-.track i{height:4px;background:var(--paper-3)}
-.track i.on{background:var(--ink-3)}
-.task.moving .track i.on,.task.run .track i.on{background:var(--moss)}
-.task.needs .track i.on,.task.blocked .track i.on{background:var(--garnet)}
-.task.run .track i.cur{background:linear-gradient(90deg,var(--moss) 0%,#9ccc86 50%,var(--moss) 100%);background-size:200% 100%;animation:shimmer 1.6s linear infinite}
-.task .tl{margin-top:6px;font-family:var(--sans);font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--ink-3)}
-.task.needs .tl b,.task.blocked .tl b{color:var(--garnet);font-weight:600}
-.task .tip{font-size:13px;color:var(--ink-2)}
-@media (prefers-reduced-motion:reduce){.task .dot,.track i.cur,.msg,.row{animation:none!important}}
-@media (min-width:1180px){body.pinsopen .tasks{padding-right:416px}}
-.tasks-in{flex:none;height:auto;display:block}
-.tgroupw+.tgroupw{margin-top:10px}
-.tgroupw .tglabel{margin:0 2px 6px}
-.tgroup{grid-auto-rows:min-content;align-content:start;align-items:start;height:auto}
-.tglabel{height:auto;align-self:start}
-.task{flex:none;height:auto;align-self:stretch;display:flex;flex-direction:column;justify-content:flex-start}
 /* ═══ themes: light (default) and dark — follows the Mac until you choose ═══ */
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#161719; --paper-2:#222326; --paper-3:#2e2f33; --card:#1d1e21; --panel:#1a1b1d; --scrim:rgba(22,23,25,.9); --hover:rgba(255,255,255,.035); --shadow:0 10px 30px rgba(0,0,0,.35); --invert:#d9d7d2; --on-invert:#161719;
   --ink:#d9d7d2; --ink-2:#bdbab4; --ink-3:#939089; --ink-4:#6c6a65;
@@ -282,24 +204,14 @@ body{background:var(--paper);color:var(--ink);transition:background .2s,color .2
 .themebtn{width:28px;height:28px;border-radius:50%;border:1px solid var(--rule);background:none;color:var(--ink-3);cursor:pointer;display:flex;align-items:center;justify-content:center;margin-right:10px}
 .themebtn:hover{color:var(--ink);background:var(--paper-2)}
 .themebtn svg{width:14px;height:14px}
-.task.run .track i.cur{background:linear-gradient(90deg,var(--moss) 0%,color-mix(in srgb,var(--moss) 45%,#fff) 50%,var(--moss) 100%);background-size:200% 100%}
 /* cards keep a readable width instead of stretching across the page */
-.tgroup{grid-template-columns:repeat(auto-fit,minmax(230px,300px));justify-content:center}
 /* header row: everything on one line, vertically centred */
 .mast{align-items:center}
 .mast .r{align-items:center;gap:10px}
 .mast .r .themebtn,.mast .r .pintoggle{margin-right:0}
 /* strip: centred; collapsible to a slim bar that opens on hover; pin keeps it open */
-.tgroupw{display:flex;flex-direction:column;align-items:center}
-.tgroup{justify-content:center;width:100%}
-.tgroupw .tglabel{align-self:center}
 .taskbar{max-width:none;display:flex;align-items:center;justify-content:center;gap:10px;height:26px;margin:0 auto}
-.taskbar .mini{display:flex;gap:6px;align-items:center}
-.taskbar .mini i{width:8px;height:8px;border-radius:50%;background:var(--ink-4)}
-.taskbar .mini i.run{background:var(--moss);animation:beat2 1.6s infinite}
-.taskbar .mini i.moving{background:var(--moss)}
-.taskbar .mini i.needs,.taskbar .mini i.blocked{background:var(--garnet)}
-.taskbar .lbl{font-family:var(--sans);font-size:12px;color:var(--ink-3)}
+.taskbar .lbl{font-family:var(--sans);font-size:13px;color:var(--ink-3)}
 .tbtn{width:24px;height:24px;border-radius:6px;border:1px solid transparent;background:none;color:var(--ink-3);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .tbtn:hover{border-color:var(--rule);color:var(--ink)}
 .tbtn.on{color:var(--ink);background:var(--paper-2)}
@@ -318,18 +230,11 @@ body{background:var(--paper);color:var(--ink);transition:background .2s,color .2
 .tally{font-size:17px;font-weight:400;line-height:1.65;letter-spacing:0}
 .mast .name{font-weight:600;letter-spacing:-.005em}
 /* cards: the main task on top, what's happening now underneath */
-.task .now{margin-top:6px;font-family:var(--sans);font-size:12.5px;line-height:1.4;color:var(--ink-2);display:flex;gap:6px}
-.task .now b{font-weight:500;color:var(--ink-3);white-space:nowrap}
-.task .tl{margin-top:8px}
-.task .tl .stg.ok{color:var(--moss);font-weight:600}
-.task.safe .dot{background:var(--moss);box-shadow:0 0 0 3px var(--moss-soft)}
 /* readable sizes: nothing under 12px; labels and secondary text 13–14px; reading text 17px */
 .tally .model,.hint,.pin .pd,.chip .fi{font-size:12px}
-.row .st,.pins .row .st,.pinmenu .or,.eyebrow,.note,.task .tp{font-size:12px;letter-spacing:.06em}
-.mast .time,.act,.worker,.more,.chip,.att a,.pintoggle,.pin .pa button,.tglabel,.taskbar .lbl{font-size:13px}
-.task .tl,.task .now,.pins .row .nx,.row .nx,.pinmenu,.pinempty,.task .tip,.tally code{font-size:13.5px}
+.row .st,.pins .row .st,.pinmenu .or,.eyebrow,.note{font-size:12px;letter-spacing:.06em}
+.mast .time,.act,.worker,.more,.chip,.att a,.pintoggle,.pin .pa button,.taskbar .lbl{font-size:13px}
 .tally pre{font-size:13.5px}
-.task .tn{font-size:15px}
 .me .utxt{font-size:16px}
 .field textarea{font-size:16px}
 .row .nm{font-size:17px}
@@ -339,26 +244,6 @@ body{background:var(--paper);color:var(--ink);transition:background .2s,color .2
 .newbelow.on{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
 .newbelow:hover{color:var(--ink)}
 .thread{scroll-behavior:auto}
-/* closing: safe to merge — only your click left. Calm olive, faded, receding; never red. */
-.task.closing{opacity:.62;background:color-mix(in srgb,var(--card) 70%,transparent);border-color:color-mix(in srgb,var(--olive) 35%,transparent);box-shadow:none;transition:opacity .3s ease-out}
-.task.closing:hover,.task.closing:focus-visible{opacity:1}
-.task.closing .dot{background:var(--olive);box-shadow:0 0 0 3px var(--olive-soft);animation:none}
-.task.closing .track i.on,.task.closing .track i.cur{background:var(--olive);animation:none}
-.task.closing .tn{color:var(--ink-2)}
-.task.closing .tl .stg,.task .tl b.ok{color:var(--olive);font-weight:600}
-/* merged: closed — fades further until it leaves the strip */
-.task.closing.done{opacity:.4}
-.task.closing.done .tn span{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink-3) 50%,transparent)}
-@media (prefers-reduced-motion:reduce){.task.closing{transition:none}}
-/* colour = meaning: amber = waiting on you (not a problem), red = blocked/broken, olive = closing */
-.task.needs{border-color:color-mix(in srgb,var(--amber) 45%,transparent)}
-.task.needs .dot{background:var(--amber);box-shadow:0 0 0 3px var(--amber-soft)}
-.task.needs .track i.on{background:var(--amber)}
-.task.needs .tl b{color:var(--amber)}
-.task.blocked{border-color:color-mix(in srgb,var(--garnet) 45%,transparent)}
-.taskbar .mini i.needs{background:var(--amber)}
-.taskbar .mini i.blocked{background:var(--garnet)}
-.taskbar .mini i.closing{background:var(--olive);opacity:.7}
 .pin .unpinx{border:none;background:none;color:var(--ink-4);font-size:18px;line-height:1;padding:0 2px;cursor:pointer;border-radius:4px}
 .pin .unpinx:hover{color:var(--ink);background:var(--paper-2)}
 .pins header .ph-r{display:flex;align-items:center;gap:6px}
@@ -366,62 +251,58 @@ body{background:var(--paper);color:var(--ink);transition:background .2s,color .2
 .pinclear:hover{color:var(--ink);background:var(--paper-2)}
 .pin .pa{display:flex}
 /* one row for everything: each product's name once above its cards, a thin divider between products */
-.tasks-in{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-start;row-gap:12px;gap:0 0}
-.tgroupw{display:flex;flex-direction:column;align-items:flex-start;padding:0 14px}
-.tgroupw+.tgroupw{margin-top:0;border-left:1px solid var(--rule)}
-.tgroupw .tglabel{align-self:flex-start;margin:0 0 6px 2px}
-.tgroup{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start;width:auto}
-.tgroup .task{flex:0 1 260px;width:260px;min-width:210px}
-@media (max-width:700px){.tgroupw{padding:0;border-left:none!important}.tgroup .task{flex:1 1 100%;width:auto}}
 /* last lines: the "now" text flows as one paragraph; stage and status never collide; equal card heights */
-.task .now{display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--rule-soft);font-size:13.5px;line-height:1.45;color:var(--ink-2)}
-.task .now b{font-weight:600;color:var(--ink-3);margin-right:4px;white-space:nowrap}
-.task .tl{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.task .tl > span:first-child{min-width:0}
-.task .tl > span:last-child{flex:none;white-space:nowrap}
-.tasks-in{align-items:stretch}
-.tgroupw{align-self:stretch}
-.tgroup{flex:1;align-items:stretch}
-.tgroup{display:grid;grid-auto-flow:column;grid-auto-columns:260px;align-items:stretch}
-.tgroup .task{width:auto;height:auto}
-@media (max-width:700px){.tgroup{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr}}
 /* cards line up row by row: title block reserves two lines, bars and stage sit on the same line in every
    card, and the spare space goes between the stage and the "now" line (which sits at the bottom) */
-.tgroup .task{display:flex;flex-direction:column}
-.task .tn{font-size:14px;line-height:1.35;min-height:calc(2 * 1.35em)}
-.task .track{margin-top:9px}
-.task .tl{font-size:12.5px;margin-top:7px}
-.task .now{margin-top:auto;font-size:12.5px;line-height:1.45}
-.task .tl + .now{margin-top:auto}
-.task .tl{margin-bottom:10px}
-.task .now,.task .tl + .now{margin-top:0;min-height:calc(2 * 1.45em + 8px)}
 /* carousel: one row that scrolls sideways; arrows appear only when there is more to see */
-.carousel{position:relative;width:100%;max-width:960px;margin:0 auto}
-.tasks-in{flex-wrap:nowrap!important;justify-content:flex-start!important;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;padding:2px 44px 4px}
+
+/* ═══ focus cards — one calm card per task: title, one quiet status line, at most one signal ═══ */
+.tasks-in{flex:none;display:flex;flex-wrap:nowrap;justify-content:flex-start;align-items:flex-start;gap:0;overflow-x:auto;scroll-snap-type:x proximity;scroll-behavior:smooth;scrollbar-width:none;min-width:0;width:100%;max-width:100%;padding:2px 0 4px;grid-column:2;grid-row:1}
 .tasks-in::-webkit-scrollbar{display:none}
-.tasks-in.fits{justify-content:center!important}
-.tgroupw{flex:none}
-.tgroup .task{scroll-snap-align:start}
-.carr{position:absolute;top:50%;transform:translateY(-30%);z-index:2;width:32px;height:32px;border-radius:50%;border:1px solid var(--rule);background:var(--card);color:var(--ink-2);font-size:20px;line-height:1;cursor:pointer;box-shadow:var(--shadow);display:none;align-items:center;justify-content:center}
+.tasks-in.fits{justify-content:center}
+.tgroupw{flex:none;display:flex;flex-direction:column;align-items:flex-start;padding:0 16px}
+.tgroupw:first-child{padding-left:0}
+.tgroupw+.tgroupw{border-left:1px solid var(--rule-soft)}
+.tglabel{display:flex;align-items:center;gap:6px;margin:0 0 8px 2px;font-family:var(--sans);font-size:13px;font-weight:500;color:var(--pc,var(--ink-3))}
+.tglabel i{width:7px;height:7px;border-radius:50%;background:var(--pc,var(--ink-4))}
+.tgroup{display:grid;grid-auto-flow:column;grid-auto-columns:264px;gap:8px;align-items:stretch}
+.task{scroll-snap-align:start;min-width:0;display:flex;flex-direction:column;gap:4px;padding:10px 12px 11px;background:var(--card);border:1px solid var(--rule-soft);border-radius:10px;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:background .15s,border-color .15s}
+.task:hover,.task:focus-visible{border-color:var(--rule);background:var(--paper-2);outline:none}
+.task .tn{display:flex;align-items:center;gap:8px;min-width:0;font-family:var(--sans);font-size:14px;font-weight:600;line-height:1.35;color:var(--ink)}
+.task .tn>span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--ink-4)}
+.task.moving .dot{background:var(--moss)}
+.task.run .dot{background:var(--moss);animation:beat2 1.6s infinite}
+.task.needs .dot,.task.blocked .dot{background:var(--garnet)}
+.task .sig{flex:none;font-size:12px;font-weight:600;line-height:1;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.task .sig.needs,.task .sig.blocked{color:var(--garnet);background:var(--garnet-soft)}
+.task .sig.verify{color:var(--amber);background:var(--amber-soft)}
+.task .sig.safe{color:var(--moss);background:var(--moss-soft)}
+.task .tl{display:flex;align-items:center;gap:8px;padding-left:16px;min-height:21px;font-family:var(--sans);font-size:13px;line-height:1.4;color:var(--ink-3)}
+.task .tl .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task .tl .nw{color:var(--ink-2)}
+.task.changed{animation:pop .6s ease}
+.carousel{position:relative;display:grid;grid-template-columns:36px minmax(0,1fr) 36px;align-items:center;gap:6px;width:100%;max-width:960px;margin:0 auto}
+.carr{grid-row:1;width:32px;height:32px;border-radius:50%;border:1px solid var(--rule);background:var(--card);color:var(--ink-2);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;visibility:hidden}
 .carr:hover{color:var(--ink)}
-.carr.prev{left:4px}.carr.next{right:4px}
-.carr.on{display:flex}
-.taskbar .mini i{cursor:pointer;transition:transform .15s,opacity .15s}
-.taskbar .mini i.out{opacity:.35}
-.taskbar .mini i.in{transform:scale(1.15)}
-@media (max-width:700px){.tasks-in{padding:2px 4px 4px}.carr{display:none!important}}
-.carousel{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;align-items:center;gap:6px}
-.tasks-in{padding:2px 0 4px!important;scroll-padding:0}
-.carr{position:static;transform:none;display:flex;visibility:hidden}
 .carr.on{visibility:visible}
 .carr.prev{grid-column:1}.carr.next{grid-column:3}
-.tasks-in{grid-column:2;grid-row:1}
-@media (max-width:700px){.carousel{grid-template-columns:0 minmax(0,1fr) 0;gap:0}.carr{visibility:hidden!important}}
-.tasks-in{min-width:0;width:100%;max-width:100%}
-.tasks-in{scroll-snap-type:x proximity}
-.tasks-in .tgroupw:first-child{padding-left:0}
-.task .tip{display:none!important}
-
+.taskbar .mini{display:flex;gap:6px;align-items:center}
+.taskbar .mini i{width:8px;height:8px;border-radius:50%;background:var(--ink-4);cursor:pointer;transition:transform .15s,opacity .15s}
+.taskbar .mini i.run{background:var(--moss);animation:beat2 1.6s infinite}
+.taskbar .mini i.moving{background:var(--moss)}
+.taskbar .mini i.needs,.taskbar .mini i.blocked{background:var(--garnet)}
+.taskbar .mini i.out{opacity:.35}
+.taskbar .mini i.in{transform:scale(1.15)}
+@media (max-width:700px){
+  .tasks-in{padding:2px 0 4px}
+  .tgroupw{padding:0;border-left:none!important}
+  .tgroupw+.tgroupw{margin-left:16px}
+  .tgroup{grid-auto-columns:min(78vw,280px)}
+  .carousel{grid-template-columns:0 minmax(0,1fr) 0;gap:0}
+  .carr{visibility:hidden!important}
+}
+@media (prefers-reduced-motion:reduce){.task .dot,.taskbar .mini i,.task.changed{animation:none!important}}
 /* focus vs pending: the cards are the focus; everything else waits in a side list, in priority order */
 .loadbtn{display:flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;border:1px solid var(--rule);background:none;color:var(--ink-3);font-family:var(--sans);font-size:12.5px;cursor:pointer}
 .loadbtn:hover,.loadbtn[aria-expanded="true"]{color:var(--ink);border-color:var(--ink-4)}
@@ -476,6 +357,7 @@ body{background:var(--paper);color:var(--ink);transition:background .2s,color .2
 .tmpop button.go,.tmpop button.lnk{font-family:var(--sans);font-size:12.5px;cursor:pointer}
 .tmpop button.go{height:28px;padding:0 14px;border:0;border-radius:6px;background:var(--invert);color:var(--on-invert)}
 .tmpop button.lnk{background:none;border:0;padding:0;color:var(--ink-3);text-decoration:underline}
+.tmpop .tmhelp{margin-top:10px;line-height:1.4;color:var(--ink-3)}
 .tmpop .err{color:var(--garnet);margin-top:8px;line-height:1.35}
 .tmpop ul{list-style:none;margin:8px 0 0;padding:0}
 .tmpop li{padding:3px 0;line-height:1.35;border-top:1px solid var(--rule-soft)}
@@ -915,7 +797,6 @@ function paintModels(list, cur){ if(!Array.isArray(list)||!list.length){ modelPi
 modelPick.addEventListener('change', async ()=>{ const id = modelPick.value; try{ const r = await fetch('/model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:id})}); if(r.ok) addNote(`Sahar now thinks on ${modelPick.selectedOptions[0].textContent}`); }catch(e){} });
 // ── main tasks, live ──
 // the bar has six steps; each true stage sits on one of them with its own label
-const STAGES = ['plan','build','test','pr','safe','merged'];
 const STAGE_POS = { plan:0, build:1, fix:1, verify:2, ready:2, test:2, pr:3, review:3, checking:4, safe:4, merged:5, done:5, live:5 };
 const STAGE_LABEL = { plan:'Planning', build:'Building', fix:'Fixing', verify:'Proving it works', ready:'Ready for your test', test:'You\'re testing', pr:'PR up', review:'PR up', checking:'Merge safety check', safe:'Safe to merge', merged:'Merged', done:'Merged', live:'Live' };
 let lastTaskKeys = {};
@@ -930,18 +811,17 @@ function renderTasks(tasks){
   if(!Array.isArray(tasks) || (!tasks.length && !openCount)){ el.innerHTML=''; box.classList.add('hasnone'); requestAnimationFrame(positionBacklog); return; }
   box.classList.remove('hasnone');
   const shown = []; { const order=[]; for(const t of tasks.filter(t=>!['merged','done','live'].includes(t.stage))){ const k=t.project||''; if(!order.includes(k)) order.push(k); } for(const k of order) shown.push(...tasks.filter(t=>(t.project||'')===k && !['merged','done','live'].includes(t.stage))); }
-  document.getElementById('taskMini').innerHTML = shown.map(t=>{ const c = ['safe','merged','done'].includes(t.stage)?'closing':t.state==='blocked'?'blocked':t.state==='needs-you'?'needs':(t.running?'run':(t.state==='moving'?'moving':'')); return `<i class="${c}" title="${esc(t.title||t.name)}"></i>`; }).join('');
+  document.getElementById('taskMini').innerHTML = shown.map(t=>{ const c = t.state==='blocked'?'blocked':t.state==='needs-you'?'needs':(t.running?'run':(t.state==='moving'?'moving':'')); return `<i class="${c}" title="${esc(t.title||t.name)}"></i>`; }).join('');
   const card = (t)=>{
-    const st = STAGE_POS[t.stage] ?? 1;
-    const cls = (t.stage==='merged'||t.stage==='done'||t.stage==='live') ? 'closing done' : t.stage==='safe' ? 'closing' : t.state==='needs-you' ? 'needs' : t.state==='blocked' ? 'blocked' : (t.running ? 'run' : (t.state==='moving' ? 'moving' : ''));
-    const right = t.stage==='safe' ? '<b class="ok">Your merge</b>' : (t.stage==='merged'||t.stage==='done') ? '<b class="ok">Closed</b>' : t.state==='needs-you' ? '<b>Needs you</b>' : t.state==='blocked' ? '<b>Blocked</b>' : (t.running ? `${t.running} working` : '');
+    const done = ['merged','done','live'].includes(t.stage);
+    const cls = t.state==='needs-you' ? 'needs' : t.state==='blocked' ? 'blocked' : t.running ? 'run' : t.state==='moving' ? 'moving' : '';
     const stage = STAGE_LABEL[t.stage] || 'Building';
-    return `<button class="task ${cls}" data-name="${esc(t.name)}" aria-label="${esc(t.project?t.project+' — ':'')}${esc(t.title||t.name)}: ${esc(stage)}${t.line?'. '+esc(t.line):''}">
+    const sig = t.state==='needs-you' ? ['needs','Needs you'] : t.state==='blocked' ? ['blocked','Blocked'] : t.stage==='verify' ? ['verify','Not checked yet'] : t.stage==='safe' ? ['safe','Your merge'] : null;
+    const step = (STAGE_POS[t.stage] ?? 1) + 1;
+    const tip = `${stage} (step ${step} of 6)${t.now?' — '+t.now:''}${t.running?' · '+t.running+' working':''}`;
+    return `<button class="task ${cls}" data-name="${esc(t.name)}" title="${esc(tip)}" aria-label="${esc(t.project?t.project+' — ':'')}${esc(t.title||t.name)}: ${esc(stage)}${sig?'. '+sig[1]:''}${t.now?'. '+esc(t.now):''}">
       <div class="tn"><i class="dot"></i><span>${esc(t.title||t.name)}</span></div>
-      <div class="track">${STAGES.map((_,i)=>`<i class="${i<st?'on':i===st?'on cur':''}"></i>`).join('')}</div>
-      <div class="tl"><span class="stg ${t.stage==='safe'?'ok':''}">${esc(stage)}</span><span>${right}</span></div>
-      ${t.now?`<div class="now"><b>Now</b> ${esc(t.now)}</div>`:''}
-
+      <div class="tl"><span class="tx">${esc(stage)}${t.now?` · <span class="nw">${esc(t.now)}</span>`:''}</span>${sig?`<span class="sig ${sig[0]}">${sig[1]}</span>`:''}</div>
     </button>`;
   };
   const groups = [];
@@ -1069,9 +949,11 @@ function tmRender(extra){
   if(tmState.connected){
     tmPop.innerHTML = `<div>${esc((tmState.user&&(tmState.user.name||tmState.user.email))||'Signed in')}${tmState.mind?` · mind ${esc(tmState.mind)}`:''}</div><div style="margin-top:8px"><button class="lnk" id="tmProof" type="button">Run proof</button></div><ul id="tmSteps"></ul>${extra||''}`;
     document.getElementById('tmProof').onclick = tmRunProof;
+    if(tmState.lastProof) tmPaintProof(tmState.lastProof);
   } else {
-    tmPop.innerHTML = `<form id="tmForm"><input type="email" id="tmEmail" placeholder="TrueMemory email" autocomplete="username" required><input type="password" id="tmPass" placeholder="Password" autocomplete="current-password" required><button class="go" type="submit">Connect</button><div class="err" id="tmErr">${extra||''}</div></form>`;
+    tmPop.innerHTML = `<form id="tmForm"><input type="email" id="tmEmail" placeholder="TrueMemory email" autocomplete="username" required><input type="password" id="tmPass" placeholder="Password" autocomplete="current-password" required><button class="go" type="submit">Connect</button><div class="err" id="tmErr">${extra||''}</div><div class="tmhelp">Signed up with Google? <button class="lnk" id="tmSetPw" type="button">Set a password</button>. TrueMemory emails you a link, and your Google sign-in keeps working.</div></form>`;
     document.getElementById('tmForm').onsubmit = tmSubmit;
+    document.getElementById('tmSetPw').onclick = tmSetPassword;
   }
 }
 async function tmSubmit(e){
@@ -1082,11 +964,23 @@ async function tmSubmit(e){
   pw.value='';
   if(r.ok){ await tmRefresh(); tmRender(); } else { err.textContent = r.error||'Could not connect.'; }
 }
+async function tmSetPassword(){
+  const email=document.getElementById('tmEmail').value.trim(), err=document.getElementById('tmErr');
+  if(!email){ err.textContent='Enter your TrueMemory email above first.'; document.getElementById('tmEmail').focus(); return; }
+  err.textContent='Sending…';
+  let r; try{ r = await (await fetch('/tm/set-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})})).json(); }catch(x){ r={ok:false,error:"Can't reach Sahar's server."}; }
+  err.textContent = r.ok ? 'Check your inbox for the TrueMemory email, set a password from the link, then connect here.' : (r.error||'Could not send the email.');
+}
 async function tmRunProof(){
   const ul=document.getElementById('tmSteps'); ul.innerHTML='<li>Running… this can take up to two minutes.</li>';
   let r; try{ r = await (await fetch('/tm/proof',{method:'POST'})).json(); }catch(x){ r={steps:[{step:'proof',ok:false,error:"Can't reach Sahar's server."}]}; }
+  tmState.lastProof=r; tmPaintProof(r);
+}
+function tmPaintProof(r){
+  const ul=document.getElementById('tmSteps'); if(!ul) return;
   const detail=(s)=> !s.ok ? esc(s.error) : s.step==='memory' ? 'written to the sahar space' : s.step==='brain' ? (s.created?'created and added to the mind':'ready in the mind') : s.step==='upload' ? 'uploaded, indexed' : s.step==='consult' ? `note ${s.markerInExcerpts?'found':'NOT found'} in the mind, ${s.memories} memories` : s.step==='search' ? `fact ${s.factFound?'found':'NOT found'} in memories` : 'done';
-  ul.innerHTML = (r.steps||[]).map(s=>`<li><span class="${s.ok?'ok':'bad'}">${s.ok?'✓':'✗'}</span> ${esc(s.step)} — ${detail(s)}</li>`).join('');
+  const when = r.at ? `<li style="opacity:.7">Last proof ${esc(new Date(r.at).toLocaleString())}</li>` : '';
+  ul.innerHTML = when + (r.steps||[]).map(s=>`<li><span class="${s.ok?'ok':'bad'}">${s.ok?'✓':'✗'}</span> ${esc(s.step)} — ${detail(s)}</li>`).join('');
 }
 tmPill.addEventListener('click',()=>{ const open=!tmPop.classList.contains('open'); tmPop.classList.toggle('open',open); tmPill.setAttribute('aria-expanded',String(open)); if(open) tmRender(); });
 document.addEventListener('click',(e)=>{ if(!e.target.closest('.tmwrap')){ tmPop.classList.remove('open'); tmPill.setAttribute('aria-expanded','false'); } });

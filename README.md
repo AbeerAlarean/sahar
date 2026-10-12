@@ -8,14 +8,16 @@
 - **Checks every result herself.** When a worker finishes, she judges the real result against that checklist (the diff, the tests, the screenshots) before it counts. Pass, and it counts. Fail, and one retry that names the gap; a second fail goes to you with the evidence. A task stays at "verify" in the window until her written verdict exists. This holds day and night.
 - **Finishes work and keeps it moving.** She prepares, plans with you, then runs an approved plan without asking again. She decides small things inside your past decisions, logs why and how to undo it, and leaves the real calls in one "needs you" queue.
 - **Works while you're away.** After you've been gone a while she works the pending list overnight: local and reversible steps only, within a spending cap, and she wakes again after a usage limit resets. When you're back she opens with one briefing: done, decided alone, needs you.
+- **Keeps a day rhythm.** Your first message of the day gets one short morning briefing (today's focus, what is due or waiting on someone, what is nearest to done, what she starts now). She asks about your meetings and how much of the week's usage is left, and the night cap uses that until the weekly reset. At the end of the day (`DAY_WRAP_HOUR`, once, only if you wrote that day and she is idle) she posts one short wrap. When a task closes she proposes the next one, and anything waiting on someone for more than a working day gets one ready-to-send follow-up.
 - **Truth, not guesses.** She never answers about code, CI or a PR from memory. If she hasn't checked it in this conversation she says "checking" and sends a reader first. A status is only what was verified, and if she gets something wrong she corrects it in one line.
 
 ## Her brain
 
-- Her craft ships in this repo: the job description (`hub-template/CLAUDE.md`), her rules and the server that enforces them.
-- Your world is meant to live in your own TrueMemory (https://truememory.com): her memory in her own space, your knowledge in a mind named "Sahar" (found by name, created if missing, or set `TM_MIND_ID`).
+- Her craft ships in this repo: the job description (`hub-template/CLAUDE.md`, which opens with her Principles: how she thinks), her rules and the server that enforces them. Principles outrank everything else in it.
+- Your world lives in your own TrueMemory (https://truememory.com), in a mind named "Sahar" (found by name, created if missing, or set `TM_MIND_ID`).
 - Live state stays on your machine: the conversation, the cards, her checks and her notes in `./hub`.
-- Honest status: today the window connects TrueMemory and runs a proof (writes a memory, uploads a note into the Sahar mind, reads both back). Filling TrueMemory with your knowledge beyond that step is in progress.
+- Status: click Connect TrueMemory in the window and run the proof (writes a memory, uploads a note, reads both back). Then `npm run seed` shows what she would send (a dry run) and `npm run seed:apply` uploads it. It seeds from your hub's own files: project notes (`mind/repos/*.md`), history (`history/*.md`), your agreement, her lessons, what is done, and each entry in `mind/decisions.md` as a memory. Re-running is safe (unchanged files are skipped, changed ones replaced), and the server re-syncs changed files after each conversation renewal.
+- She asks her mind before answering or briefing on a task, remembers each decision, rule and correction with its reason as it happens, and saves new or changed project notes. Workers never touch the mind. If TrueMemory is not connected she says so once and works from the local notes.
 
 ## You stay in control
 
@@ -48,6 +50,13 @@ npm start
 
 Open **http://localhost:4747**. She speaks first.
 
+Once TrueMemory is connected, fill her mind from your hub:
+
+```bash
+npm run seed         # dry run: shows the plan, uploads nothing
+npm run seed:apply   # uploads (safe to re-run)
+```
+
 ### Run it as a service (macOS)
 
 ```bash
@@ -76,6 +85,8 @@ She introduces herself, checks your setup and tells you exactly what's missing (
 | `NIGHT_WEEK_RESET_DOW` / `NIGHT_WEEK_RESET_HOUR` | `2` / `1` | weekday (0 = Sunday) and hour your weekly allowance resets |
 | `NIGHT_CAFFEINATE` | unset | set to `1` to keep the Mac awake while she runs |
 | `NIGHT_LOGS_DIR` | her Claude project logs | where the spend estimate reads |
+| `DAY_WRAP_HOUR` | `18:30` | when the end-of-day wrap may fire (`18:30` or `18.5`) |
+| `DAY_TZ` | system timezone | the timezone that decides "the first message of the day" and the wrap |
 | `TM_MIND_ID` | unset | use this TrueMemory mind instead of the one named "Sahar" |
 | `ROTATE_TOKENS` | `100000` | the hidden conversation is renewed past this size (invisibly, once no worker is running) |
 | `SAHAR_USER_SETTINGS` | unset | set to `off` to ignore your global Claude Code instructions |
@@ -84,7 +95,7 @@ If you change your Claude account or plan, restart her.
 
 ## Safety rails
 
-Her own hands are limited to her notes, delegation and read-only looks; everything that changes something is a worker's. The fences hold even if the model forgets the rules, and `npm test` checks them (plus the night-shift maths, the check-before-done logic, the read-only allowlist and the TrueMemory helpers) without any model or network.
+Her own hands are limited to her notes, delegation and read-only looks; everything that changes something is a worker's. The fences hold even if the model forgets the rules, and `npm test` checks them (plus the night-shift and day-rhythm maths, the TrueMemory seed planning, the check-before-done logic, the read-only allowlist and the TrueMemory helpers) without any model or network.
 
 ```bash
 npm test

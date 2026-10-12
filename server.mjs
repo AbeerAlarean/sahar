@@ -6,9 +6,11 @@ import { spawn, execFileSync } from 'node:child_process';
 import os from 'node:os';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import * as tm from './tm.mjs';
+import { mindServer, MIND_TOOLS } from './mindtools.mjs';
+import { applySync } from './seed.mjs';
 import { readOnlyBash } from './eyes.mjs';
 import { slugOf, taskOfWorker, uncheckedTasks, overlayVerify, uncheckedNote } from './checks.mjs';
-import { parseResetTime, looksLikeLimit, isAway, wakeDecision, capMath, weekWindow, createUsageMeter } from './night.mjs';
+import { parseResetTime, looksLikeLimit, isAway, wakeDecision, capMath, weekWindow, createUsageMeter, dayKey, parseWrapHour, morningDue, wrapDecision, DAY_TZ } from './night.mjs';
 
 // Sahar — one continuous conversation about all of a builder's work.
 // She never does the work herself: every task goes to a background worker, so she is
@@ -105,6 +107,8 @@ CARDS = EVERYTHING RUNNING. The strip is every task the person is working on wit
 
 LIVE MAIN TASKS FILE. Keep mind/main-tasks.json current — the window draws the person's main tasks from it, live. Shape: [{"name":"<main task, their words — the anchor you tag workers with>","title":"<the MAIN task — the overall goal, in plain product words, at most 6 — e.g. 'Finishing the checkout redesign', 'Moving auth to the new provider'>","now":"<what is being done on it RIGHT NOW, at most 8 words — e.g. 'Fixing the failing payment test'>","project":"<the product/repo in human words, e.g. Checkout, Search>","stage":"plan|build|fix|verify|ready|test|pr|checking|safe|merged","state":"moving|needs-you|blocked|waiting","line":"<at most 12 words: where it is>"}]. Rewrite it the moment any main task changes stage or state. Stages, exactly: plan · build · fix (changes after a review or a test failed) · verify (built; a worker is proving it works) · ready (built and proven — waiting for the person to test) · test (the person is testing) · pr (pushed, PR up) · checking (the merge-safety check is running) · safe (the check passed — safe to merge) · merged. Every time a worker starts or finishes on a main task, re-check that task's stage, state and now-line and rewrite the file in the same turn. When a task is safe, its only remaining step is the person's merge — that is good news, not a problem (the window shows it calm and faded). When it is merged, set stage merged; once the merge is confirmed deployed, remove it from the file (it leaves the strip) and record it in mind/done.md. The card must never say a stage that isn't true right now: if a PR gets new commits, it's back to build or fix, and "safe" is lost until the check passes again. FOCUS AND PENDING — nothing is ever lost when priorities shift. main-tasks.json holds EVERY open task, not just today's: keep the array in priority order (most important first) and give each task "focus": true or false. focus:true = what we are really working on now (the cards; keep it to 3 or fewer). focus:false = pending — still open, waiting its turn (the window lists these in a side list, in your order). When the person shifts priority, move tasks between focus and pending and re-order — never delete a task just because it lost focus; a task leaves the file only when merged/closed or the person drops it (then record it in mind/done.md or decisions.md). Pending tasks keep honest stage/state/line too. LOAD: count open tasks. When the person starts something new while 8 or more are open, say so in one line before planning it ("You have N open — want to close X or Y first?") and name the nearest-to-done ones; when a task is close to done (safe, ready for test, one step left), nudge to finish it before picking up new work. Start every worker's description with the main task in brackets — "[Search] fix the white band" — so the window can show which tasks have workers running.
 
+YOUR BRAIN (TrueMemory). Your tools mcp__mind__ask_mind / remember / save_knowledge reach the person's TrueMemory. READ: before answering or briefing on any task, and before re-reading local files, call ask_mind about it. WRITE: every decision, rule, correction or fact the person states goes to remember() in the SAME turn (with the reason) AND is still appended to mind/decisions.md (local stays the re-seed source); when a task closes, one outcome note via remember(); a new or changed project note or document they drop goes to save_knowledge. Live state (mind/workload.md, main-tasks.json, mind/checks) stays local only. If a tool says TrueMemory is not connected, say so once, keep working from the local notes, and write locally as before.
+
 PERSONA. If mind/persona.md exists it is the person's own persona (written with them, or from a persona they already keep elsewhere): take its voice rules and things to avoid as your voice. Your name stays Sahar. Where the persona and the agreement disagree, the agreement wins.
 
 MAIN TASKS ANCHOR EVERYTHING. The person works on a few main tasks at a time (the top-level things they named, in their words — e.g. "Checkout PR", "Search", "Auth migration"). Every feature, fix, question and worker belongs under one of them. Keep them as the "Main tasks" section at the top of mind/workload.md.
@@ -142,9 +146,17 @@ NIGHT SHIFT — a <night-shift> note means the person is away and you are workin
 - Save every brief and every check result in the night file the note names (mind/night/<YYYY-MM-DD>.md), under Done / Decided alone / Needs you, as you go.
 - Builders are Sonnet and readers Haiku; name the model on every worker.
 - If the note says the night's share is used, stop launching workers and note it. If nothing doable is left, reply exactly: night shift: nothing left. Otherwise reply in one line at most; the person is not reading.
-- On the person's first message after a night shift, open with ONE short briefing — Done / Decided alone (each with reason and how to undo it) / Needs you (with the evidence) — then update the cards and main-tasks.json to match, then answer them.`;
+- On the person's first message after a night shift, open with ONE short briefing — Done / Decided alone (each with reason and how to undo it) / Needs you (with the evidence) — then update the cards and main-tasks.json to match, then answer them.
 
-const ROTATION_PROMPT = `<rotation>This hidden conversation is about to rotate; the person will not see this turn. Write into the mind everything from this conversation that is not there yet: rewrite mind/workload.md in place to the current truth; append new decisions with their reasons to mind/decisions.md, new lessons to mind/lessons.md, finished features to mind/done.md, rules the person gave to mind/agreement.md, repo facts to mind/repos/<repo>.md. Then reply with exactly one word: rotated.</rotation>`;
+DAY RHYTHM — you are proactive by day, not only when asked.
+- A <morning> note means this is the person's first message of the day: open with ONE short briefing before answering. ask_mind first. Cover: today's focus (main-tasks.json and mind/workload.md); what is due, or waiting on someone and for how long; the items nearest to done to close first; what you will start now. No calendar is connected: end the briefing with ONE line asking any meetings today you should plan around, and roughly how much of this week's usage is left. Save the answer: meetings via remember(); the budget as JSON {"weeklyRemainingUnits": N, "setAt": <epoch ms>} in .budget.json (the server's cap reads it). Ask this once a day, then answer their message.
+- A <wrap> note is the end-of-day wrap, delivered by the server: one short visible message: what closed today, what moved, what is stuck and why, tomorrow's first moves. Then remember() the day's outcome in ONE note.
+- When a task closes, in the same reply propose the next one from the priorities; if it sits inside an approved plan, start it.
+- Anything waiting on a person longer than a working day: offer ONE ready-to-send follow-up, once, never nag.
+- Watch deadlines in mind/workload.md and mind/decisions.md, and set up the prep ahead of them (briefs, checks, drafts) before the day they bite.
+- Keep "Vision and priorities" as a knowledge doc: save_knowledge with filename vision-and-priorities.md. If it does not exist yet, draft it at the next morning briefing from ask_mind and the agreement, and ask the person to correct it once.`;
+
+const ROTATION_PROMPT = `<rotation>This hidden conversation is about to rotate; the person will not see this turn. Write into the mind everything from this conversation that is not there yet (anything decided this session that you have not yet saved with remember() goes there first, with its reason): rewrite mind/workload.md in place to the current truth; append new decisions with their reasons to mind/decisions.md, new lessons to mind/lessons.md, finished features to mind/done.md, rules the person gave to mind/agreement.md, repo facts to mind/repos/<repo>.md. Then reply with exactly one word: rotated.</rotation>`;
 
 // ── the crew: cheaper models for routine work; the main model keeps the judgment ──
 const AGENTS = {
@@ -215,6 +227,7 @@ const NEEDS_WORD = [
 const MAIN_ALLOWED = new Set([
   'Read', 'Grep', 'Glob', 'Write', 'Edit', 'Agent', 'Task', 'TodoWrite', 'SendMessage',
   'TaskStop', 'TaskOutput', 'WebSearch', 'WebFetch', 'ToolSearch',
+  ...MIND_TOOLS, // her brain in TrueMemory — main thread only
 ]);
 /** The real location of a path, following symlinks (macOS: /tmp is /private/tmp). The file
  *  itself may not exist yet, so resolve the nearest existing folder above it. */
@@ -275,6 +288,7 @@ export function fenceHook(recentUserText, nightBlock) {
       }
       return withModel(input);
     }
+    if (MIND_TOOLS.includes(input.tool_name)) return deny('the mind belongs to Sahar herself — a worker reports back and she writes it down');
     if (input.tool_name !== 'Bash') return withModel(input);
     const cmd = String(input.tool_input?.command || '');
     for (const [re, why] of ALWAYS_BLOCKED) if (re.test(cmd)) return deny(why);
@@ -338,16 +352,13 @@ Attached because a hidden conversation is starting. First Contact: ${firstContac
 <setup>
 ${setupCheck(tmConnected)}
 </setup>
-Other mind files to read when needed: mind/ → ${list('mind')}; mind/repos/ → ${list('mind/repos')}; history/ → ${list('history')} (recall only).
+Your decisions with reasons, history, project notes and lessons live in your mind (TrueMemory): call ask_mind before answering or briefing on any task, and before re-reading local files. Fallback when TrueMemory is not connected (the tool says so): read the local files — mind/ → ${list('mind')}; mind/repos/ → ${list('mind/repos')}; history/ → ${list('history')} (recall only) — and behave as before.
 
 === mind/workload.md ===
 ${read('mind/workload.md')}
 
 === mind/agreement.md ===
 ${read('mind/agreement.md')}
-
-=== mind/lessons.md ===
-${read('mind/lessons.md')}
 ${fs.existsSync(path.join(HUB_DIR, 'mind', 'persona.md')) ? `\n=== mind/persona.md ===\n${read('mind/persona.md')}\n` : ''}</mind>`;
 }
 
@@ -369,6 +380,9 @@ function activityLine(toolUse) {
     case 'Edit': return 'writing it down';
     case 'Grep':
     case 'Glob': return 'searching my notes';
+    case 'mcp__mind__ask_mind': return 'asking my mind';
+    case 'mcp__mind__remember':
+    case 'mcp__mind__save_knowledge': return 'writing it into my mind';
     case 'Task':
     case 'Agent': return `handing off: ${input.description || 'a task'}`.toLowerCase();
     case 'TodoWrite': return 'updating the plan';
@@ -464,6 +478,9 @@ function broadcast(payload) {
 }
 
 // ── the one long-lived conversation ───────────────────────────────────────────
+// The last TrueMemory proof result, kept so the panel can show it again after a page refresh.
+let lastProof = null;
+
 const live = {
   q: null,             // the SDK query
   push: null,          // feeds a user message into it
@@ -532,6 +549,7 @@ function startConversation({ resume } = {}) {
       // The person's own global Claude Code instructions apply (SAHAR_USER_SETTINGS=off skips them).
       settingSources: process.env.SAHAR_USER_SETTINGS === 'off' ? ['project'] : ['user', 'project'],
       agents: AGENTS,
+      mcpServers: { mind: mindServer },
       permissionMode: 'default',
       canUseTool: async (_name, toolInput) => ({ behavior: 'allow', updatedInput: toolInput }),
       hooks: { PreToolUse: [{ hooks: [fenceHook(recentUserText, nightCapReached)] }] },
@@ -640,6 +658,7 @@ function afterTurn() {
     live.q = null;
     live.push = null;
     clearState();
+    applySync({ hub: HUB_DIR, log: (m) => console.log(`[tm-sync] ${m}`) }).then((r) => console.log(`[tm-sync] after rotation: ${r.uploaded} new, ${r.replaced} replaced, ${r.memories} memories, ${r.errors.length} errors`)).catch((err) => console.log(`[tm-sync] skipped: ${tm.friendlyError(err)}`));
     const held = live.heldDuringRotation.splice(0);
     for (const m of held) deliver(m.text, m.attachments, m.opts);
     return;
@@ -672,11 +691,17 @@ function deliver(text, attachments = [], opts = {}) {
     return;
   }
   // A night-shift note must never count as the person's words (it mentions "push" and "PR").
-  if (!opts.night) live.recentWords = [...live.recentWords, text].slice(-3);
+  if (!opts.night && !opts.wrap) live.recentWords = [...live.recentWords, text].slice(-3);
   const cards = mainTasks().map((t) => `${t.title || t.name} (${t.stage})`).join(' · ') || 'none';
   let prefix = nowLine() + `\n<cards>Cards now: ${cards}. If this message starts, agrees or names a task with no card, add its card now; if it closes, merges, drops or parks one, remove that card now.</cards>\n`;
+  const morning = opts.user && morningDue({ now: Date.now(), lastMorningDate: night.lastMorningDate });
+  if (morning) {
+    night.lastMorningDate = dayKey(Date.now(), DAY_TZ);
+    saveNight();
+    prefix += `<morning>${MORNING_NOTE}${night.nightActive ? ' The night shift ran too: merge it into this same briefing, not a second one.' : ''}</morning>\n`;
+  }
   if (opts.user && night.nightActive) {
-    prefix += `<briefing>The person is back after your night shift. Open mind/night/${nightDate()}.md and any other file in mind/night from this shift, then start your reply with ONE short briefing: Done (checked and passed) / Decided alone (each with its reason and how to undo it) / Needs you (questions and blockers, with the evidence). Update the cards and main-tasks.json to match, then answer their message.</briefing>\n`;
+    prefix += `<briefing>The person is back after your night shift. Open mind/night/${nightDate()}.md and any other file in mind/night from this shift, then start your reply with ONE short briefing (merged with the <morning> note if there is one): Done (checked and passed) / Decided alone (each with its reason and how to undo it) / Needs you (questions and blockers, with the evidence). Update the cards and main-tasks.json to match, then answer their message.</briefing>\n`;
     night.nightActive = false;
     night.nightIdle = false;
     saveNight();
@@ -715,6 +740,18 @@ const NIGHT_MAX_UNITS = Number(process.env.NIGHT_MAX_UNITS || 30); // flat per-n
 const NIGHT_WEEKLY_BUDGET_UNITS = process.env.NIGHT_WEEKLY_BUDGET_UNITS ? Number(process.env.NIGHT_WEEKLY_BUDGET_UNITS) : NaN;
 const NIGHT_WEEK = { dow: Number(process.env.NIGHT_WEEK_RESET_DOW ?? 2), hour: Number(process.env.NIGHT_WEEK_RESET_HOUR ?? 1) };
 const NIGHT_FILE = path.join(DATA_DIR, '.night.json');
+const MORNING_NOTE = "First message of the day. Before answering, call ask_mind, then open with ONE short briefing: today's focus (main-tasks.json and mind/workload.md); what is due, or waiting on someone and for how long; the items nearest to done to close first; what you will start now. No calendar is connected: end with ONE line asking any meetings today to plan around, and roughly how much of this week's usage is left; save meetings via remember() and the budget as {\"weeklyRemainingUnits\": N, \"setAt\": epoch ms} in .budget.json. If knowledge doc vision-and-priorities.md does not exist yet, draft it from ask_mind and the agreement and ask the person to correct it once.";
+const DAY_WRAP_HOUR = parseWrapHour(process.env.DAY_WRAP_HOUR, 18.5);
+const BUDGET_FILE = path.join(DATA_DIR, '.budget.json');
+/** Remaining weekly units she saved from the person's answer; only valid until the weekly reset. */
+function budgetHint(week) {
+  try {
+    const b = JSON.parse(fs.readFileSync(BUDGET_FILE, 'utf8'));
+    const n = Number(b.weeklyRemainingUnits);
+    return Number.isFinite(n) && n >= 0 && b.setAt >= week.start && b.setAt < week.next ? { remaining: n, setAt: b.setAt } : null;
+  } catch { return null; }
+}
+
 const NIGHT_LOGS = process.env.NIGHT_LOGS_DIR || path.join(os.homedir(), '.claude', 'projects', HUB_DIR.replace(/[^A-Za-z0-9]/g, '-'));
 const meter = createUsageMeter(NIGHT_LOGS);
 const night = (() => {
@@ -745,10 +782,12 @@ function nightDate() {
 // remaining allowance is not readable anywhere.
 function nightCap(now = Date.now()) {
   const week = weekWindow(now, NIGHT_WEEK);
+  const hint = budgetHint(week);
   return {
     ...capMath({
-      budget: NIGHT_WEEKLY_BUDGET_UNITS,
-      usedThisWeek: Number.isFinite(NIGHT_WEEKLY_BUDGET_UNITS) ? meter.unitsSince(week.start, now) : 0,
+      ...(Number.isFinite(NIGHT_WEEKLY_BUDGET_UNITS) || !hint
+        ? { budget: NIGHT_WEEKLY_BUDGET_UNITS, usedThisWeek: Number.isFinite(NIGHT_WEEKLY_BUDGET_UNITS) ? meter.unitsSince(week.start, now) : 0 }
+        : { budget: hint.remaining, usedThisWeek: 0 }),
       now, nextReset: week.next, maxUnits: NIGHT_MAX_UNITS,
       nightSpent: night.nightActive && night.nightStartedAt ? meter.unitsSince(night.nightStartedAt, now) : 0,
     }),
@@ -791,9 +830,23 @@ function nightInstruction(cap) {
   return `${nowLine()}
 <night-shift>The person has been away for ${NIGHT_AWAY_MIN}+ minutes. Run the night shift per your rules (hub CLAUDE.md "Night shift"): work the pending list in main-tasks.json in priority order, focus first; local, reversible steps only; every fence unchanged; small calls only inside an agreed decision in mind/decisions.md, logged with reason and undo; everything else to "Needs you". Every worker brief has a "Done means:" checklist and you check the real result yourself against it (one retry, then park). Save every brief and check result in ${f} (${HUB_DIR}/${f}). Estimated night spend so far ${cap.spent.toFixed(1)} of ${cap.cap.toFixed(1)} units. If nothing doable is left, reply exactly: night shift: nothing left.</night-shift>`;
 }
+/** End-of-day wrap: once per local day, a visible turn, only when she is idle and the person wrote today. */
+function wrapTick(now = Date.now()) {
+  const d = wrapDecision({
+    now, lastUserAt: night.lastUserAt, lastWrapDate: night.lastWrapDate, wrapHour: DAY_WRAP_HOUR,
+    turnActive: live.turnActive, rotating: live.rotating, workers: live.workers.size, nightActive: night.nightActive,
+  });
+  if (!d.wrap) return d;
+  night.lastWrapDate = dayKey(now, DAY_TZ);
+  saveNight();
+  console.log('[day] end-of-day wrap');
+  deliver(`${nowLine()}\n<wrap>It is the end of the day. Give the person ONE short wrap, after ask_mind: what closed today, what moved, what is stuck and why, tomorrow's first moves. Then remember() the day's outcome in one note. Update the cards to match.</wrap>`, [], { wrap: true });
+  return d;
+}
 /** Heartbeat and limit-reset wakes both come through here. */
 function nightTick(source) {
   const now = Date.now();
+  if (source === 'heartbeat' && wrapTick(now).wrap) return { wake: false, reason: 'day wrap' };
   if (source === 'heartbeat') nextHeartbeatAt = now + NIGHT_HEARTBEAT_MIN * 60000;
   if (night.limitedUntil && now >= night.limitedUntil) { night.limitedUntil = 0; saveNight(); }
   const cap = nightCap(now);
@@ -962,10 +1015,11 @@ const server = http.createServer(async (req, res) => {
     catch (err) { res.end(JSON.stringify({ ok: false, error: tm.friendlyError(err) })); }
   } else if (req.method === 'GET' && req.url === '/tm/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    try { res.end(JSON.stringify(await tm.status())); } catch (err) { res.end(JSON.stringify({ connected: false, error: tm.friendlyError(err) })); }
+    try { res.end(JSON.stringify({ ...(await tm.status()), lastProof })); } catch (err) { res.end(JSON.stringify({ connected: false, error: tm.friendlyError(err) })); }
   } else if (req.method === 'POST' && req.url === '/tm/proof') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    try { res.end(JSON.stringify(await tm.runProof())); } catch (err) { res.end(JSON.stringify({ passed: false, steps: [{ step: 'proof', ok: false, error: tm.friendlyError(err) }] })); }
+    try { lastProof = { ...(await tm.runProof()), at: Date.now() }; } catch (err) { lastProof = { passed: false, at: Date.now(), steps: [{ step: 'proof', ok: false, error: tm.friendlyError(err) }] }; }
+    res.end(JSON.stringify(lastProof));
   } else if (req.method === 'GET' && req.url === '/health') {
     const s = loadState();
     res.writeHead(200, { 'Content-Type': 'application/json' });

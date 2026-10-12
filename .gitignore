@@ -8,3 +8,4 @@ data/
 .session.json
 .thread.json
 *.log
+.budget.json

@@ -29,7 +29,7 @@ export function wallToUtc(tz, y, mo, d, h = 0, mi = 0) {
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 /**
- * "…your session limit resets 5:30am (Asia/Singapore)" or "resets Oct 13 at 1am (Asia/Singapore)"
+ * "…your session limit resets 5:30am (Asia/Kuala_Lumpur)" or "resets Oct 13 at 1am (Asia/Kuala_Lumpur)"
  * → the reset as epoch ms, or null when the text has no reset time. `nowMs` is injectable for tests.
  */
 export function parseResetTime(text, nowMs = Date.now()) {
@@ -181,4 +181,34 @@ export function createUsageMeter(dir, { maxAgeMs = 8 * DAY } = {}) {
       return sum;
     },
   };
+}
+
+// ── day rhythm: morning briefing + end-of-day wrap (pure, tested in day.test.mjs) ──
+export const DAY_TZ = process.env.DAY_TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+/** Local calendar date YYYY-MM-DD of `ms` in `tz`. */
+export function dayKey(ms, tz = DAY_TZ) {
+  const p = partsInTz(ms, tz);
+  return `${p.y}-${String(p.mo).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
+}
+/** "18:30", "18.5" or 18.5 → hours as a number (18.5); falls back to `dflt` on junk. */
+export function parseWrapHour(v, dflt = 18.5) {
+  const s = String(v ?? '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  const n = m ? Number(m[1]) + Number(m[2]) / 60 : Number(s);
+  return s !== '' && Number.isFinite(n) && n >= 0 && n < 24 ? n : dflt;
+}
+/** The person's first message of a local day: no morning has been delivered for today's date yet. */
+export function morningDue({ now, lastMorningDate, tz = DAY_TZ }) {
+  return lastMorningDate !== dayKey(now, tz);
+}
+/** Heartbeat check for the end-of-day wrap. Once per local day, after the wrap hour, only if the person wrote today. */
+export function wrapDecision({ now, lastUserAt, lastWrapDate, wrapHour = 18.5, tz = DAY_TZ, turnActive = false, rotating = false, workers = 0, nightActive = false }) {
+  const p = partsInTz(now, tz);
+  if (nightActive) return { wrap: false, reason: 'night shift' };
+  if (p.h + p.mi / 60 < wrapHour) return { wrap: false, reason: 'before wrap time' };
+  if (lastWrapDate === dayKey(now, tz)) return { wrap: false, reason: 'already wrapped today' };
+  if (!lastUserAt || dayKey(lastUserAt, tz) !== dayKey(now, tz)) return { wrap: false, reason: 'person sent nothing today' };
+  if (turnActive || rotating) return { wrap: false, reason: 'mid-turn' };
+  if (workers > 0) return { wrap: false, reason: 'workers running' };
+  return { wrap: true, reason: 'end of day' };
 }

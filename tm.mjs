@@ -277,6 +277,30 @@ export async function uploadNote(filename, markdown, { brainId } = {}) {
   return { packId: pack.id, brainId: bid, status };
 }
 
+export async function deletePack(packId) {
+  try { await api(`/knowledge-packs/${encodeURIComponent(packId)}`, { method: 'DELETE', timeoutMs: 30000 }); return true; }
+  catch (err) { if (err instanceof TmError && err.status === 404) return false; throw err; }
+}
+
+// Bulk route (maintenance lane): ≤50 episodes and ≤700KB serialized per call; always async, so poll the job.
+export async function addMemoriesBulk(texts, { sourceDescription = 'Sahar decisions' } = {}) {
+  if (!texts.length) return { episodes: 0 };
+  const res = await api('/memories/graph/bulk', {
+    method: 'POST', timeoutMs: 60000,
+    body: { agent_id: AGENT_ID, mode: 'append', episodes: texts.map((data) => ({ data, type: 'document', source_description: sourceDescription })) },
+  });
+  if (!res?.job_id) throw new TmError('TrueMemory did not return a job for the bulk memory write.');
+  for (let i = 0; i < 300; i++) {
+    await sleep(3000);
+    const st = await api(`/memories/graph/status/${encodeURIComponent(res.job_id)}`);
+    if (st?.done) {
+      if (!st.succeeded) throw new TmError('TrueMemory took the batch but failed to process it.');
+      return { episodes: texts.length, jobId: res.job_id };
+    }
+  }
+  throw new TmError('The memory batch is still processing after 15 minutes.');
+}
+
 export async function consult(query) {
   const mid = await resolveMind();
   return api(`/minds/${encodeURIComponent(mid)}/consult`, { method: 'POST', body: { query, agent_id: AGENT_ID } });

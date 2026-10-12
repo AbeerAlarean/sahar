@@ -7,22 +7,22 @@ const eq = (name, got, exp) => {
   n++;
   if (JSON.stringify(got) !== JSON.stringify(exp)) { bad++; console.log(`MISMATCH ${name}: got=${JSON.stringify(got)} expected=${JSON.stringify(exp)}`); }
 };
-const sgt = (iso) => Date.parse(iso + '+08:00');
+const kl = (iso) => Date.parse(iso + '+08:00');
 
-// ── reset-time parser (Asia/Singapore = UTC+8, no DST) ──
-const now = sgt('2026-10-11T10:00:00');
-eq('time only, later today', parseResetTime("You've hit your limit · your session limit resets 5:30pm (Asia/Singapore)", now), sgt('2026-10-11T17:30:00'));
-eq('time only, already passed → tomorrow', parseResetTime('resets 5:30am (Asia/Singapore)', now), sgt('2026-10-12T05:30:00'));
-eq('no minutes', parseResetTime('your session limit resets 1pm (Asia/Singapore)', now), sgt('2026-10-11T13:00:00'));
-eq('12am is midnight', parseResetTime('resets 12:50am (Asia/Singapore)', now), sgt('2026-10-12T00:50:00'));
-eq('12pm is noon', parseResetTime('resets 12:50pm (Asia/Singapore)', now), sgt('2026-10-11T12:50:00'));
-eq('date + at', parseResetTime('resets Oct 13 at 1am (Asia/Singapore)', now), sgt('2026-10-13T01:00:00'));
-eq('date, minutes, no at', parseResetTime('resets Oct 13 1:15am (Asia/Singapore)', now), sgt('2026-10-13T01:15:00'));
-eq('other zone is honoured', parseResetTime('resets 5:30am (UTC)', sgt('2026-10-11T10:00:00')), Date.parse('2026-10-11T05:30:00Z'));
-eq('year rollover', parseResetTime('resets Jan 2 at 9am (Asia/Singapore)', sgt('2026-12-31T22:00:00')), sgt('2027-01-02T09:00:00'));
+// ── reset-time parser (Asia/Kuala_Lumpur = UTC+8, no DST) ──
+const now = kl('2026-10-11T10:00:00');
+eq('time only, later today', parseResetTime("You've hit your limit · your session limit resets 5:30pm (Asia/Kuala_Lumpur)", now), kl('2026-10-11T17:30:00'));
+eq('time only, already passed → tomorrow', parseResetTime('resets 5:30am (Asia/Kuala_Lumpur)', now), kl('2026-10-12T05:30:00'));
+eq('no minutes', parseResetTime('your session limit resets 1pm (Asia/Kuala_Lumpur)', now), kl('2026-10-11T13:00:00'));
+eq('12am is midnight', parseResetTime('resets 12:50am (Asia/Kuala_Lumpur)', now), kl('2026-10-12T00:50:00'));
+eq('12pm is noon', parseResetTime('resets 12:50pm (Asia/Kuala_Lumpur)', now), kl('2026-10-11T12:50:00'));
+eq('date + at', parseResetTime('resets Oct 13 at 1am (Asia/Kuala_Lumpur)', now), kl('2026-10-13T01:00:00'));
+eq('date, minutes, no at', parseResetTime('resets Oct 13 1:15am (Asia/Kuala_Lumpur)', now), kl('2026-10-13T01:15:00'));
+eq('other zone is honoured', parseResetTime('resets 5:30am (UTC)', kl('2026-10-11T10:00:00')), Date.parse('2026-10-11T05:30:00Z'));
+eq('year rollover', parseResetTime('resets Jan 2 at 9am (Asia/Kuala_Lumpur)', kl('2026-12-31T22:00:00')), kl('2027-01-02T09:00:00'));
 eq('no reset in text', parseResetTime('Not logged in · Please run /login', now), null);
 eq('bad zone', parseResetTime('resets 5am (Nowhere/Land)', now), null);
-eq('limit detected', looksLikeLimit("You've hit your individual spend limit · resets 10:50pm (Asia/Singapore)"), true);
+eq('limit detected', looksLikeLimit("You've hit your individual spend limit · resets 10:50pm (Asia/Kuala_Lumpur)"), true);
 eq('login is not a limit', looksLikeLimit('Not logged in · Please run /login'), false);
 
 // ── away logic ──
@@ -53,11 +53,11 @@ eq('last day takes at most half of what is left', capMath({ budget: 400, usedThi
 eq('flat cap also limits a rich budget', capMath({ budget: 4000, usedThisWeek: 0, now: 0, nextReset: DAY, maxUnits: 30 }).cap, 30);
 eq('overspent week → 0, not ok', capMath({ budget: 100, usedThisWeek: 150, now: 0, nextReset: DAY }).ok, false);
 eq('night spend past share → stop', capMath({ budget: 400, usedThisWeek: 100, now: 0, nextReset: 3 * DAY, nightSpent: 50 }).ok, false);
-const w = weekWindow(sgt('2026-10-11T10:00:00'), { dow: 2, hour: 1, tz: 'Asia/Singapore' });
-eq('week starts last Tue 1am', w.start, sgt('2026-10-06T01:00:00'));
-eq('week resets next Tue 1am', w.next, sgt('2026-10-13T01:00:00'));
-const w2 = weekWindow(sgt('2026-10-13T00:30:00'), { dow: 2, hour: 1, tz: 'Asia/Singapore' });
-eq('just before reset still old week', w2.next, sgt('2026-10-13T01:00:00'));
+const w = weekWindow(kl('2026-10-11T10:00:00'), { dow: 2, hour: 1, tz: 'Asia/Kuala_Lumpur' });
+eq('week starts last Tue 1am', w.start, kl('2026-10-06T01:00:00'));
+eq('week resets next Tue 1am', w.next, kl('2026-10-13T01:00:00'));
+const w2 = weekWindow(kl('2026-10-13T00:30:00'), { dow: 2, hour: 1, tz: 'Asia/Kuala_Lumpur' });
+eq('just before reset still old week', w2.next, kl('2026-10-13T01:00:00'));
 eq('opus costs more than sonnet', usageUnits('claude-opus-5-5', { output_tokens: 1000 }) > usageUnits('claude-sonnet-5-5', { output_tokens: 1000 }), true);
 
 // ── worker model enforcement ──
