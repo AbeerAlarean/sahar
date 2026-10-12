@@ -34,7 +34,7 @@ body::after{content:none;display:none;position:fixed;inset:-20% -10% auto -10%;h
 .act::before{content:'· ';color:var(--moss)}
 
 /* thread */
-.thread{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 28px 28px;scroll-behavior:smooth;position:relative;z-index:1}
+.thread{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 28px 28px;scroll-behavior:smooth;position:relative;z-index:1}
 .thread-in{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
 .msg{animation:rise .45s cubic-bezier(.2,.7,.2,1) both}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -95,6 +95,12 @@ body::after{content:none;display:none;position:fixed;inset:-20% -10% auto -10%;h
 .sendbtn:hover{background:var(--paper-2)}
 .sendbtn:disabled{opacity:.3;cursor:default}
 .sendbtn svg{width:14px;height:14px}
+.micbtn{flex:none;width:32px;height:32px;border-radius:50%;border:1px solid var(--rule);background:transparent;color:var(--ink-3);cursor:pointer;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.micbtn[hidden]{display:none}
+.micbtn:hover,.micbtn[aria-pressed="true"]{background:var(--paper-2);color:var(--ink)}
+.micbtn[aria-pressed="true"]{color:var(--garnet);border-color:var(--garnet)}
+.micbtn svg{width:15px;height:15px}
+.mic-hint{max-width:640px;margin:4px auto 0;font-family:var(--sans);font-size:12px;color:var(--ink-3)}
 .hint{max-width:640px;margin:8px auto 0;font-family:var(--mono);font-size:10px;color:var(--ink-4);letter-spacing:.04em}
 @media (max-width:600px){.mast,.act,.thread,.inputbar{padding-left:16px;padding-right:16px}.tally{font-size:17px}.row{grid-template-columns:22px minmax(0,1fr);row-gap:3px}.row .st{grid-column:2;text-align:left;white-space:normal}.row .nx{grid-column:2}}
 .thread-in>*{min-width:0;max-width:100%}
@@ -390,7 +396,7 @@ body{background:var(--paper);color:var(--ink);transition:background .2s,color .2
 .task .tl{margin-bottom:10px}
 .task .now,.task .tl + .now{margin-top:0;min-height:calc(2 * 1.45em + 8px)}
 /* carousel: one row that scrolls sideways; arrows appear only when there is more to see */
-.carousel{position:relative;max-width:1200px;margin:0 auto}
+.carousel{position:relative;width:100%;max-width:960px;margin:0 auto}
 .tasks-in{flex-wrap:nowrap!important;justify-content:flex-start!important;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;padding:2px 44px 4px}
 .tasks-in::-webkit-scrollbar{display:none}
 .tasks-in.fits{justify-content:center!important}
@@ -415,20 +421,79 @@ body{background:var(--paper);color:var(--ink);transition:background .2s,color .2
 .tasks-in{scroll-snap-type:x proximity}
 .tasks-in .tgroupw:first-child{padding-left:0}
 .task .tip{display:none!important}
+
+/* focus vs pending: the cards are the focus; everything else waits in a side list, in priority order */
+.loadbtn{display:flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;border:1px solid var(--rule);background:none;color:var(--ink-3);font-family:var(--sans);font-size:12.5px;cursor:pointer}
+.loadbtn:hover,.loadbtn[aria-expanded="true"]{color:var(--ink);border-color:var(--ink-4)}
+.loadbtn .ld{width:7px;height:7px;border-radius:50%;background:var(--moss)}
+.loadbtn.heavy .ld{background:#c47a2c}.loadbtn.over .ld{background:var(--garnet)}
+.loadbtn.over{color:var(--garnet);border-color:color-mix(in srgb,var(--garnet) 40%,transparent)}
+.backlog{display:none;position:fixed;z-index:30;top:82px;right:22px;bottom:16px;width:min(360px,calc(100vw - 32px));box-sizing:border-box;pointer-events:none}
+.backlog.open{display:flex;flex-direction:column;overflow:hidden}
+.bl-hd{display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;pointer-events:auto}
+.bl-t{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink-2)}
+.bl-sub{font-family:var(--sans);font-size:13px;color:var(--ink-3);margin-top:2px}
+.bl-meter{display:none;height:4px;margin:0 2px;border-radius:2px;background:var(--rule-soft);overflow:hidden}
+.bl-meter i{display:block;height:100%;background:var(--moss);transition:width .3s}
+.bl-meter i.heavy{background:#c47a2c}.bl-meter i.over{background:var(--garnet)}
+.bl-msg{display:none;font-family:var(--sans);font-size:13px;line-height:1.45;color:var(--ink-2);padding:8px 2px 4px}
+.bl-msg.over{color:var(--garnet)}
+.bl-list{flex:1;min-height:0;overflow-y:auto;padding:0 3px 4px;pointer-events:auto;overscroll-behavior:contain}
+.bl-sec{display:none}
+.bl-row{display:grid;grid-template-columns:23px minmax(0,1fr);gap:9px;margin:0 0 7px;padding:9px 11px;border:1px solid var(--rule);border-radius:10px;background:var(--panel);box-shadow:0 4px 14px color-mix(in srgb,var(--ink) 8%,transparent);width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;animation:pending-in .2s ease-out both;animation-delay:calc(var(--item-index,0) * 25ms)}
+.bl-row:hover{border-color:var(--moss);box-shadow:0 7px 20px color-mix(in srgb,var(--ink) 13%,transparent);transform:translateX(-3px) scale(1.015)}
+@keyframes pending-in{from{opacity:0;transform:translateX(9px)}to{opacity:1;transform:translateX(0)}}
+@media(prefers-reduced-motion:reduce){.bl-row{animation:none;transition:none}}
+.bl-row .n{font-family:var(--mono);font-size:11px;color:var(--ink-4);padding-top:2px}
+.bl-row .t{font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink);line-height:1.35}
+.bl-row .m{font-family:var(--sans);font-size:12px;color:var(--ink-3);margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bl-row .m .pj{color:var(--pc,var(--ink-2));font-weight:500}
+.bl-row .wait{display:inline-flex;align-items:center;border-radius:10px;padding:2px 7px;background:var(--paper-2);color:var(--ink-3);font-weight:600}
+.bl-row .wait.waiting{background:var(--amber-soft);color:var(--amber)}
+.bl-row .wait.hold{background:var(--paper-2);color:var(--ink-3)}
+.bl-row .wait.you{background:var(--garnet-soft);color:var(--garnet)}
+.bl-row.focus .t{font-weight:600}
+@media (max-width:600px){.backlog{right:10px;width:min(340px,calc(100vw - 20px));bottom:12px}}
+
+.modelpick{height:26px;border:1px solid var(--rule);border-radius:13px;background:none;color:var(--ink-3);font-family:var(--sans);font-size:12.5px;padding:0 8px;cursor:pointer}
+.modelpick:hover,.modelpick:focus{color:var(--ink);border-color:var(--ink-4);outline:none}
+.modelpick option{color:#222}
+
+.tmwrap{position:relative}
+.tmpill{display:flex;align-items:center;gap:6px;height:26px;border:1px solid var(--rule);border-radius:13px;background:none;color:var(--ink-3);font-family:var(--sans);font-size:12.5px;padding:0 10px;cursor:pointer;white-space:nowrap}
+.tmpill:hover,.tmpill:focus{color:var(--ink);border-color:var(--ink-4);outline:none}
+.tmpill .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-4)}
+.tmpill.on .dot{background:var(--moss)}
+.tmpop{position:absolute;right:0;top:34px;width:260px;background:var(--card);border:1px solid var(--rule);border-radius:10px;box-shadow:var(--shadow);padding:12px;z-index:20;display:none;font-size:12.5px;color:var(--ink-2)}
+.tmpop.open{display:block}
+/* the masthead is its own layer under the task strip; lift it while the TrueMemory panel is open */
+.mast:has(.tmpop.open){z-index:40}
+.tmwrap{position:relative}
+.tmpop{width:300px;padding:16px}
+.tmpop input{height:34px;font-size:14px}
+.tmpop button.go{height:34px;font-size:14px;width:100%}
+.tmpop input{display:block;width:100%;box-sizing:border-box;margin:0 0 8px;height:28px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:12.5px;padding:0 8px}
+.tmpop button.go,.tmpop button.lnk{font-family:var(--sans);font-size:12.5px;cursor:pointer}
+.tmpop button.go{height:28px;padding:0 14px;border:0;border-radius:6px;background:var(--invert);color:var(--on-invert)}
+.tmpop button.lnk{background:none;border:0;padding:0;color:var(--ink-3);text-decoration:underline}
+.tmpop .err{color:var(--garnet);margin-top:8px;line-height:1.35}
+.tmpop ul{list-style:none;margin:8px 0 0;padding:0}
+.tmpop li{padding:3px 0;line-height:1.35;border-top:1px solid var(--rule-soft)}
+.tmpop li .ok{color:var(--moss)} .tmpop li .bad{color:var(--garnet)}
 </style>
 </head>
 <body>
   <div class="mast">
     <div class="name"><svg class='star' aria-hidden='true' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><path d='M32 1 C36 21 43 28 63 32 C43 36 36 43 32 63 C28 43 21 36 1 32 C21 28 28 21 32 1Z' fill='#dd8a26'/><path d='M32 17 C34 27 37 30 47 32 C37 34 34 37 32 47 C30 37 27 34 17 32 C27 30 30 27 32 17Z' fill='#ffe3b0'/></svg>Sahar</div>
-    <div class="r"><button class="themebtn" id="themeBtn" aria-label="Switch light or dark"></button><button class="pintoggle" id="pinToggle" aria-controls="pins">Pinned</button><div class="time" id="time"></div></div>
+    <div class="r"><div class="tmwrap"><button class="tmpill" id="tmPill" type="button" aria-haspopup="true" aria-expanded="false"><span class="dot"></span><span id="tmLabel">Connect TrueMemory</span></button><div class="tmpop" id="tmPop" role="dialog" aria-label="TrueMemory"></div></div><select class="modelpick" id="modelPick" aria-label="Model Sahar thinks on" title="Model Sahar thinks on"></select><button class="themebtn" id="themeBtn" aria-label="Switch light or dark"></button><button class="pintoggle" id="pinToggle" aria-controls="pins">Pinned</button><div class="time" id="time"></div></div>
   </div>
   <aside class="pins" id="pins" aria-label="Pinned answers">
     <header><b>Pinned</b><span class="ph-r"><button id="pinClear" class="pinclear" type="button">Clear all</button><button id="pinClose" aria-label="Close pinned">×</button></span></header>
     <div class="pinlist" id="pinList"></div>
   </aside>
   <div class="tasks hasnone" id="tasks">
-    <div class="taskbar"><button class="tbtn chev" id="taskChev" aria-label="Collapse or expand main tasks" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><span class="lbl">Running</span><span class="mini" id="taskMini"></span><button class="tbtn pin" id="taskPin" aria-label="Keep main tasks open" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76V6h6v4.76l2.5 3.24H6.5z"/><path d="M8 3h8"/></svg></button></div>
-    <div class="tasks-body"><div class="carousel"><button class="carr prev" id="carPrev" aria-label="Previous tasks" type="button">‹</button><div class="tasks-in" id="tasksIn"></div><button class="carr next" id="carNext" aria-label="More tasks" type="button">›</button></div></div>
+    <div class="taskbar"><button class="tbtn chev" id="taskChev" aria-label="Collapse or expand main tasks" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><span class="lbl">Focus</span><span class="mini" id="taskMini"></span><button class="loadbtn" id="loadBtn" type="button" aria-label="Show pending items" aria-expanded="false"><span class="ld"></span><span id="loadTxt">Pending</span></button><button class="tbtn pin" id="taskPin" aria-label="Keep main tasks open" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76V6h6v4.76l2.5 3.24H6.5z"/><path d="M8 3h8"/></svg></button></div>
+    <div class="tasks-body"><div class="carousel"><button class="carr prev" id="carPrev" aria-label="Previous tasks" type="button">‹</button><div class="tasks-in" id="tasksIn"></div><button class="carr next" id="carNext" aria-label="More tasks" type="button">›</button></div><aside class="backlog" id="backlog" aria-label="Pending items"><div class="bl-hd"><div><div class="bl-t">Pending</div><div class="bl-sub" id="blSub"></div></div><button class="tbtn" id="blClose" aria-label="Close">×</button></div><div class="bl-meter"><i id="blBar"></i></div><div class="bl-msg" id="blMsg"></div><div class="bl-list" id="blList"></div></aside></div>
   </div>
   <div class="act" id="act"></div>
 
@@ -439,11 +504,13 @@ body{background:var(--paper);color:var(--ink);transition:background .2s,color .2
     <div class="chips" id="chips"></div>
     <div class="input-in">
       <div class="field"><textarea id="input" rows="1" placeholder="Say it…" autofocus aria-label="Message Sahar"></textarea></div>
+      <button class="micbtn" id="micBtn" type="button" aria-label="Start voice input" title="Start voice input" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg></button>
       <button class="sendbtn" id="sendBtn" title="Send" aria-label="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
       </button>
     </div>
-    <div class="hint">enter sends · esc stops her · drop or paste files · she's never busy — talk any time</div>
+    <div class="hint">enter sends · esc recalls your last message · while she replies, esc stops her (quick second esc recalls) · drop or paste files</div>
+    <div class="mic-hint" id="micHint" aria-live="polite"></div>
   </div>
 
 <script>
@@ -451,6 +518,8 @@ const thread = document.getElementById('threadIn');
 const threadScroll = document.getElementById('thread');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('sendBtn');
+const micBtn = document.getElementById('micBtn');
+const micHint = document.getElementById('micHint');
 const act = document.getElementById('act');
 
 // a sense of time, quietly
@@ -559,7 +628,8 @@ document.body.appendChild(newBelow);
 threadScroll.addEventListener('scroll', ()=>{ if(atBottom()) newBelow.classList.remove('on'); });
 function ask(text){ input.value = text; input.focus(); autoGrow(); }
 
-function addUser(text, attachments, fromYou){
+function addUser(text, attachments, fromYou, remember=false){
+  if(remember) lastSentMessage = {text:String(text||''),attachments:(attachments||[]).map(a=>({name:a.name,label:a.label,type:a.type}))};
   const d = document.createElement('div');
   d.className = 'msg me';
   const att = (attachments||[]).map(a => /^image\//.test(a.type||'')
@@ -629,7 +699,7 @@ document.addEventListener('click', closePinMenu);
 const pinsEl = document.getElementById('pins');
 const pinToggle = document.getElementById('pinToggle');
 function openPins(on){ pinsEl.classList.toggle('open', on); document.body.classList.toggle('pinsopen', on); try{ localStorage.setItem('sahar.pinsOpen', on?'1':'0'); }catch(e){} }
-pinToggle.addEventListener('click', ()=>openPins(!pinsEl.classList.contains('open')));
+pinToggle.addEventListener('click', ()=>{ const on=!pinsEl.classList.contains('open'); if(on) openBacklog(false); openPins(on); });
 document.getElementById('pinClose').addEventListener('click', ()=>openPins(false));
 document.getElementById('pinClear').addEventListener('click', ()=>{ if(loadPins().length && window.confirm('Unpin everything?')) savePins([]); });
 function renderPins(){
@@ -702,7 +772,7 @@ async function addFiles(fileList){
     pendingFiles.push(entry); renderChips();
     try{
       const res = await fetch('/upload', { method:'POST', headers:{ 'Content-Type': entry.type, 'X-File-Name': encodeURIComponent(label) }, body: file });
-      if(!res.ok) throw new Error(res.status === 413 ? 'too large (max 25 MB)' : `upload failed (${res.status})`);
+      if(!res.ok) throw new Error(res.status === 413 ? 'too large (over 25 MB)' : `upload failed (${res.status})`);
       const saved = await res.json();
       entry.name = saved.name; entry.uploading = false;
     }catch(e){
@@ -719,11 +789,74 @@ window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; dropEl.classList.remove('on'); if(e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); input.focus(); });
 input.addEventListener('paste', e => { const files = [...(e.clipboardData?.files||[])]; if(files.length){ e.preventDefault(); addFiles(files); } });
 
+// Optional browser speech recognition: no service key or server changes. Results are
+// appended as editable text; they are never submitted automatically.
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null, recording = false, handledResults = 0, micHintTimer = null;
+function setRecording(on){
+  recording = on;
+  micBtn.setAttribute('aria-pressed', on?'true':'false');
+  micBtn.setAttribute('aria-label', on?'Stop voice input':'Start voice input');
+  micBtn.title = on?'Stop voice input':'Start voice input';
+  if(on) micHint.textContent = 'Listening… Click the mic or press Enter to stop.';
+  else if(micHint.textContent.startsWith('Listening')) micHint.textContent = '';
+}
+function showMicHint(message){
+  clearTimeout(micHintTimer);
+  micHint.textContent = message;
+  micHintTimer = setTimeout(()=>{ if(!recording) micHint.textContent=''; }, 4500);
+}
+function stopRecording(){ if(recognition && recording){ try{ recognition.stop(); }catch{} } }
+if(!SpeechRecognition){ micBtn.hidden = true; }
+else {
+  micBtn.addEventListener('click', ()=>{
+    if(recording){ stopRecording(); return; }
+    try{
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      handledResults = 0;
+      recognition.onresult = event=>{
+        for(let i=handledResults;i<event.results.length;i++){
+          const result = event.results[i];
+          if(!result.isFinal) continue;
+          const words = result[0]?.transcript?.trim();
+          if(words){ input.value += `${input.value && !/\s$/.test(input.value)?' ':''}${words}`; autoGrow(); }
+        }
+        handledResults = event.results.length;
+      };
+      recognition.onerror = event=>{
+        if(event.error==='not-allowed'||event.error==='service-not-allowed') showMicHint('Voice input unavailable — allow microphone access in browser settings.');
+        else if(event.error!=='no-speech'&&event.error!=='aborted') showMicHint('Voice input stopped. You can keep editing your text.');
+      };
+      recognition.onend = ()=>setRecording(false);
+      recognition.start();
+      setRecording(true);
+      input.focus();
+    }catch{ setRecording(false); showMicHint('Voice input unavailable in this browser.'); }
+  });
+}
+
+let lastSentMessage = null;
+function restoreLastMessage(){
+  if(!lastSentMessage) return false;
+  const msg = lastSentMessage;
+  lastSentMessage = null;
+  const current = input.value;
+  if(msg.text) input.value = current ? `${current}${/\s$/.test(current)?'':'\n\n'}${msg.text}` : msg.text;
+  for(const a of msg.attachments||[]){
+    if(!pendingFiles.some(f=>f.name===a.name)) pendingFiles.push({id:Math.random().toString(36).slice(2),label:a.label||a.name,type:a.type||'application/octet-stream',name:a.name,uploading:false,previewUrl:null});
+  }
+  renderChips(); autoGrow(); input.focus(); input.setSelectionRange(input.value.length,input.value.length);
+  return true;
+}
+
 async function send(text, hidden){
   text = (text ?? input.value).trim();
   if(!hidden && pendingFiles.some(f => f.uploading)){ setAct('still uploading — one moment'); return; }
   const attachments = hidden ? [] : pendingFiles.filter(f => f.name).map(f => ({ name: f.name, label: f.label, type: f.type }));
   if(!text && attachments.length === 0) return;
+  if(!hidden) lastSentMessage = {text,attachments};
   if(!hidden){ input.value=''; input.style.height='auto'; pendingFiles = []; renderChips(); jumpDown(); }
   try{
     const res = await fetch('/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, hidden:!!hidden, attachments})});
@@ -734,10 +867,52 @@ async function send(text, hidden){
 }
 
 sendBtn.addEventListener('click',()=>send());
-input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()} });
+input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(recording) stopRecording(); else send()} });
 input.addEventListener('input',autoGrow);
 
 
+
+// ── focus vs pending: everything open, in her priority order, with a load meter ──
+let openCount = 0;
+const LOAD_OK = 6, LOAD_HEAVY = 9;
+const backlogEl = document.getElementById('backlog'), loadBtn = document.getElementById('loadBtn'), tasksEl = document.getElementById('tasks');
+function renderBacklog(all){
+  const open = (Array.isArray(all)?all:[]).filter(t=>!['merged','done','live'].includes(t.stage));
+  openCount = open.length;
+  const pending = open.filter(t=>t.focus===false);
+  const lvl = openCount > LOAD_HEAVY ? 'over' : openCount > LOAD_OK ? 'heavy' : '';
+  loadBtn.className = 'loadbtn ' + lvl;
+  document.getElementById('loadTxt').textContent = pending.length ? `${pending.length} pending` : 'Pending';
+  document.getElementById('blSub').textContent = `${pending.length} item${pending.length===1?'':'s'}`;
+  const bar = document.getElementById('blBar'); bar.className = lvl; bar.style.width = Math.min(100, Math.round(openCount/12*100)) + '%';
+  const near = pending.filter(t=>['safe','ready','test','checking','pr'].includes(t.stage)).map(t=>t.title||t.name);
+  const msg = document.getElementById('blMsg'); msg.className = 'bl-msg ' + lvl;
+  msg.textContent = pending.length===0 ? 'No pending items are listed yet.'
+    : lvl==='over' ? `That's a lot open. Finish before picking up anything new${near.length?` — closest to done: ${near.slice(0,3).join(', ')}.`:'.'}`
+    : lvl==='heavy' ? `Getting heavy. Close something before starting the next one${near.length?` — ${near[0]} is nearly there.`:'.'}`
+    : near.length ? `Room to breathe. Nearly done: ${near.slice(0,2).join(', ')}.` : 'Room to breathe.';
+  const row = (t,i)=>{ const status=t.pendingStatus||(t.state==='waiting'?'Waiting':'On hold'); const sl=status.toLowerCase();
+    const kind=/on hold|your word/.test(sl)?'hold':/you|reminder/.test(sl)?'you':/^waiting on /.test(sl)?'waiting':'';
+    return `<button class="bl-row" style="--item-index:${i}" data-name="${esc(t.name)}"><span class="n">${i+1}</span><span><div class="t">${esc(t.title||t.name)}</div><div class="m">${t.project?`<span class="pj" style="${projColor(t.project)}">${esc(t.project)}</span>`:''}<span class="wait ${kind}">${esc(status)}</span></div>${t.line?`<div class="m">${esc(t.line)}</div>`:''}</span></button>`; };
+  document.getElementById('blList').innerHTML = pending.length
+    ? `<div class="bl-sec">Pending, in priority order</div>${pending.map(row).join('')}` : '';
+  document.querySelectorAll('#blList .bl-row').forEach(b=>b.addEventListener('click',()=>ask(`Where is ${b.dataset.name}?`)));
+}
+function positionBacklog(){
+  const focusCount=document.querySelectorAll('#tasksIn .task').length;
+  const top=focusCount>=3&&!tasksEl.classList.contains('collapsed')?Math.ceil(tasksEl.getBoundingClientRect().bottom+8):82;
+  backlogEl.style.top=`${top}px`;
+}
+window.addEventListener('resize',positionBacklog);
+function openBacklog(on){ backlogEl.classList.toggle('open', on); tasksEl.classList.toggle('show-pending', on); loadBtn.setAttribute('aria-expanded', on?'true':'false'); try{ localStorage.setItem('sahar.blOpen', on?'1':'0'); }catch(e){} }
+loadBtn.addEventListener('click', e=>{ e.stopPropagation(); openBacklog(!backlogEl.classList.contains('open')); });
+document.getElementById('blClose').addEventListener('click', ()=>openBacklog(false));
+try{ if(localStorage.getItem('sahar.blOpen')==='1' && window.innerWidth>=1180) openBacklog(true); }catch(e){}
+
+// ── which model she thinks on — switch to save tokens ──
+const modelPick = document.getElementById('modelPick');
+function paintModels(list, cur){ if(!Array.isArray(list)||!list.length){ modelPick.style.display='none'; return; } modelPick.innerHTML = list.map(o=>`<option value="${esc(o.id)}">${esc(o.label)}</option>`).join(''); if(cur) modelPick.value = cur; }
+modelPick.addEventListener('change', async ()=>{ const id = modelPick.value; try{ const r = await fetch('/model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:id})}); if(r.ok) addNote(`Sahar now thinks on ${modelPick.selectedOptions[0].textContent}`); }catch(e){} });
 // ── main tasks, live ──
 // the bar has six steps; each true stage sits on one of them with its own label
 const STAGES = ['plan','build','test','pr','safe','merged'];
@@ -748,9 +923,11 @@ let lastTaskKeys = {};
 const PROJ_HUES = [[0,'#c47a2c',''],[0,'#3f7fb5',''],[0,'#7d5bb0',''],[0,'#2f8a7a',''],[0,'#b5566b',''],[0,'#6b7f3a','']];
 function projColor(p){ let h=0; for(const c of p.toLowerCase()) h=(h*31+c.charCodeAt(0))|0; const [,fg,bg]=PROJ_HUES[Math.abs(h)%PROJ_HUES.length]; return `--pc:${fg};--pb:${bg}`; }
 function renderTasks(tasks){
+  renderBacklog(tasks);
+  if(Array.isArray(tasks)) tasks = tasks.filter(t=>t.focus!==false);
   const el = document.getElementById('tasksIn');
   const box = document.getElementById('tasks');
-  if(!Array.isArray(tasks) || !tasks.length){ el.innerHTML=''; box.classList.add('hasnone'); return; }
+  if(!Array.isArray(tasks) || (!tasks.length && !openCount)){ el.innerHTML=''; box.classList.add('hasnone'); requestAnimationFrame(positionBacklog); return; }
   box.classList.remove('hasnone');
   const shown = []; { const order=[]; for(const t of tasks.filter(t=>!['merged','done','live'].includes(t.stage))){ const k=t.project||''; if(!order.includes(k)) order.push(k); } for(const k of order) shown.push(...tasks.filter(t=>(t.project||'')===k && !['merged','done','live'].includes(t.stage))); }
   document.getElementById('taskMini').innerHTML = shown.map(t=>{ const c = ['safe','merged','done'].includes(t.stage)?'closing':t.state==='blocked'?'blocked':t.state==='needs-you'?'needs':(t.running?'run':(t.state==='moving'?'moving':'')); return `<i class="${c}" title="${esc(t.title||t.name)}"></i>`; }).join('');
@@ -777,17 +954,24 @@ function renderTasks(tasks){
   el.querySelectorAll('.task').forEach(b=>{ const k=b.dataset.name; if(lastTaskKeys[k] && lastTaskKeys[k]!==next[k]){ b.classList.add('changed'); setTimeout(()=>b.classList.remove('changed'),700);} });
   lastTaskKeys = next;
   if(!trackEl.dataset.ready){ trackEl.scrollLeft = 0; trackEl.dataset.ready = '1'; }
-  requestAnimationFrame(updateCarousel);
+  requestAnimationFrame(()=>{updateCarousel();positionBacklog();});
 }
 
 // ── Escape stops her current reply; workers keep going ──
+let escArmedUntil = 0;
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if(document.querySelector('.pinmenu')){ closePinMenu(); return; }
-  if(!busy) return;
   e.preventDefault();
-  setAct('stopping…');
-  fetch('/stop',{method:'POST'}).catch(()=>{});
+  if(recording){ stopRecording(); return; }
+  if(Date.now()<escArmedUntil){ escArmedUntil=0; restoreLastMessage(); return; }
+  if(busy){
+    escArmedUntil=Date.now()+700;
+    setAct('stopping…');
+    fetch('/stop',{method:'POST'}).catch(()=>{});
+    return;
+  }
+  restoreLastMessage();
 });
 function addNote(text){ const d=document.createElement('div'); d.className='msg note'; d.textContent=`— ${text} —`; thread.appendChild(d); scrollDown(); }
 
@@ -811,6 +995,7 @@ function setStrip(mode){ // 'open' | 'collapsed'
   taskPin.classList.toggle('on', mode==='open'); taskPin.setAttribute('aria-pressed', mode==='open');
   taskChev.setAttribute('aria-expanded', mode==='open');
   try{ localStorage.setItem('sahar.strip', mode); }catch(e){}
+  requestAnimationFrame(positionBacklog);
 }
 taskChev.addEventListener('click',()=>{ setStrip(tasksBox.classList.contains('collapsed')?'open':'collapsed'); taskChev.blur(); });
 taskPin.addEventListener('click',()=>{ setStrip(tasksBox.classList.contains('collapsed')?'open':'collapsed'); taskPin.blur(); });
@@ -841,13 +1026,13 @@ function connect(){
   const es = new EventSource('/events');
   es.onmessage = (ev)=>{
     const m = JSON.parse(ev.data);
-    if(m.type==='hello'){ workers=m.workers||0; if(m.model) currentModel=m.model; setBusy(!!m.busy); renderTasks(m.tasks); }
+    if(m.type==='hello'){ workers=m.workers||0; if(m.model) currentModel=m.model; paintModels(m.models, m.modelId); setBusy(!!m.busy); renderTasks(m.tasks); }
     else if(m.type==='tasks'){ renderTasks(m.tasks); }
     else if(m.type==='note'){ addNote(m.text); }
     else if(m.type==='user'){ addUser(m.text, m.attachments); }
     else if(m.type==='text'){ hideBreath(); addSahar(m.text, m.model); if(busy) showBreath(); }
     else if(m.type==='status'){ if(busy) setAct(m.text); }
-    else if(m.type==='model'){ currentModel=m.model; }
+    else if(m.type==='model'){ currentModel=m.model; if(m.id) modelPick.value=m.id; }
     else if(m.type==='worker'){ hideBreath(); addWorker(m); if(busy) showBreath(); }
     else if(m.type==='workers'){ workers=m.count; refreshAct(); }
     else if(m.type==='busy'){ setBusy(m.on); }
@@ -860,7 +1045,7 @@ async function boot(){
   let items = [];
   try{ items = await (await fetch('/thread')).json(); }catch(e){}
   for(const it of items){
-    if(it.kind==='user') addUser(it.text, it.attachments);
+    if(it.kind==='user') addUser(it.text, it.attachments, false, true);
     else if(it.kind==='tally') addSahar(it.text, it.model);
     else if(it.kind==='worker') addWorker(it);
     else if(it.kind==='note') addNote(it.text);
@@ -875,6 +1060,38 @@ async function boot(){
     send('(The person just opened the window for the first time. The thread is empty. Speak first.)', true);
   }
 }
+// ── TrueMemory: connect + Phase 0 proof (the password is sent once and never kept here) ──
+const tmPill=document.getElementById('tmPill'), tmPop=document.getElementById('tmPop'), tmLabel=document.getElementById('tmLabel');
+let tmState={connected:false};
+function tmPaintPill(){ tmPill.classList.toggle('on',!!tmState.connected); tmLabel.textContent = tmState.connected ? 'TrueMemory connected' : 'Connect TrueMemory'; }
+async function tmRefresh(){ try{ tmState = await (await fetch('/tm/status')).json(); }catch(e){ tmState={connected:false}; } tmPaintPill(); }
+function tmRender(extra){
+  if(tmState.connected){
+    tmPop.innerHTML = `<div>${esc((tmState.user&&(tmState.user.name||tmState.user.email))||'Signed in')}${tmState.mind?` · mind ${esc(tmState.mind)}`:''}</div><div style="margin-top:8px"><button class="lnk" id="tmProof" type="button">Run proof</button></div><ul id="tmSteps"></ul>${extra||''}`;
+    document.getElementById('tmProof').onclick = tmRunProof;
+  } else {
+    tmPop.innerHTML = `<form id="tmForm"><input type="email" id="tmEmail" placeholder="TrueMemory email" autocomplete="username" required><input type="password" id="tmPass" placeholder="Password" autocomplete="current-password" required><button class="go" type="submit">Connect</button><div class="err" id="tmErr">${extra||''}</div></form>`;
+    document.getElementById('tmForm').onsubmit = tmSubmit;
+  }
+}
+async function tmSubmit(e){
+  e.preventDefault();
+  const email=document.getElementById('tmEmail').value, pw=document.getElementById('tmPass');
+  const err=document.getElementById('tmErr'); err.textContent='Connecting…';
+  let r; try{ r = await (await fetch('/tm/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pw.value})})).json(); }catch(x){ r={ok:false,error:"Can't reach Sahar's server."}; }
+  pw.value='';
+  if(r.ok){ await tmRefresh(); tmRender(); } else { err.textContent = r.error||'Could not connect.'; }
+}
+async function tmRunProof(){
+  const ul=document.getElementById('tmSteps'); ul.innerHTML='<li>Running… this can take up to two minutes.</li>';
+  let r; try{ r = await (await fetch('/tm/proof',{method:'POST'})).json(); }catch(x){ r={steps:[{step:'proof',ok:false,error:"Can't reach Sahar's server."}]}; }
+  const detail=(s)=> !s.ok ? esc(s.error) : s.step==='memory' ? 'written to the sahar space' : s.step==='brain' ? (s.created?'created and added to the mind':'ready in the mind') : s.step==='upload' ? 'uploaded, indexed' : s.step==='consult' ? `note ${s.markerInExcerpts?'found':'NOT found'} in the mind, ${s.memories} memories` : s.step==='search' ? `fact ${s.factFound?'found':'NOT found'} in memories` : 'done';
+  ul.innerHTML = (r.steps||[]).map(s=>`<li><span class="${s.ok?'ok':'bad'}">${s.ok?'✓':'✗'}</span> ${esc(s.step)} — ${detail(s)}</li>`).join('');
+}
+tmPill.addEventListener('click',()=>{ const open=!tmPop.classList.contains('open'); tmPop.classList.toggle('open',open); tmPill.setAttribute('aria-expanded',String(open)); if(open) tmRender(); });
+document.addEventListener('click',(e)=>{ if(!e.target.closest('.tmwrap')){ tmPop.classList.remove('open'); tmPill.setAttribute('aria-expanded','false'); } });
+tmRefresh();
+
 boot();
 </script>
 </body>

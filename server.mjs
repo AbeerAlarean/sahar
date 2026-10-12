@@ -1,9 +1,14 @@
 import http from 'node:http';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { spawn, execFileSync } from 'node:child_process';
+import os from 'node:os';
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import * as tm from './tm.mjs';
+import { readOnlyBash } from './eyes.mjs';
+import { slugOf, taskOfWorker, uncheckedTasks, overlayVerify, uncheckedNote } from './checks.mjs';
+import { parseResetTime, looksLikeLimit, isAway, wakeDecision, capMath, weekWindow, createUsageMeter } from './night.mjs';
 
 // Sahar — one continuous conversation about all of a builder's work.
 // She never does the work herself: every task goes to a background worker, so she is
@@ -32,8 +37,18 @@ function ensureHub() {
   copy(TEMPLATE_DIR, HUB_DIR);
 }
 
+/** TrueMemory is required for Sahar: the line she is told about it at First Contact. */
+export function tmSetupLine(connected) {
+  return connected
+    ? 'TrueMemory: connected.'
+    : 'TrueMemory: not connected — a setup item. Fix: click "Connect TrueMemory" in the window (top right) and sign in with your TrueMemory email and password.';
+}
+// Whether a saved TrueMemory sign-in exists; refreshed at start and after connecting.
+let tmConnected = false;
+async function refreshTmSetup() { try { tmConnected = await tm.hasLogin(); } catch { tmConnected = false; } }
+
 /** What she needs on this machine, checked at start — told to her plainly at First Contact. */
-function setupCheck() {
+function setupCheck(tmConnected) {
   const run = (cmd, args) => {
     try { return { ok: true, out: execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15000 }) }; }
     catch (err) { return { ok: false, out: String(err.stdout || err.stderr || err.message || '') }; }
@@ -47,16 +62,20 @@ function setupCheck() {
   const gh = run('gh', ['auth', 'status']);
   const ghLine = gh.ok ? 'GitHub CLI: signed in.' : 'GitHub CLI: not signed in or not installed — PRs and authorship need it ("brew install gh" then "gh auth login").';
   const git = run('git', ['--version']);
-  return [claudeLine, ghLine, git.ok ? 'git: installed.' : 'git: NOT installed.'].join('\n');
+  return [claudeLine, ghLine, git.ok ? 'git: installed.' : 'git: NOT installed.', tmSetupLine(tmConnected)].join('\n');
 }
 const STATE_FILE = path.join(DATA_DIR, '.session.json');
 const THREAD_FILE = path.join(DATA_DIR, '.thread.json');
 const PORT = Number(process.env.PORT || 4747);
-const MAIN_MODEL = process.env.MAIN_MODEL || 'claude-opus-5-5';
+const MAIN_MODEL_DEFAULT = process.env.MAIN_MODEL || 'claude-opus-5-5';
+// the model she thinks on — switchable from the window (to save tokens), remembered across restarts
+const MODEL_CHOICES = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-4-5-20251001', 'claude-fable-5-1'];
+const MODEL_FILE = path.join(DATA_DIR, '.model');
+let MAIN_MODEL = (() => { try { const m = fs.readFileSync(MODEL_FILE, 'utf8').trim(); return MODEL_CHOICES.includes(m) ? m : MAIN_MODEL_DEFAULT; } catch { return MAIN_MODEL_DEFAULT; } })();
 // Rotate the hidden conversation when its context passes this share of the window OR this
 // many tokens, and only while no worker is running (a rotation would end them).
 const ROTATE_AT = Number(process.env.ROTATE_AT || 0.55);
-const ROTATE_TOKENS = Number(process.env.ROTATE_TOKENS || 200000);
+const ROTATE_TOKENS = Number(process.env.ROTATE_TOKENS || 100000);
 const THREAD_CAP = 3000;
 // Files dropped or pasted into the window: kept on this machine so workers can open them.
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
@@ -74,13 +93,17 @@ TRUTH, NOT GUESSES — this outranks speed.
 - Before you propose or report anything on a main task, re-read that task's lines in mind/decisions.md (each carries its reason) and never act or speak against one. If a new idea conflicts with a decision, name the decision and ask.
 - If you notice you said something wrong, correct it in one line straight away.
 
-YOU NEVER DO THE WORK YOURSELF — this is the whole point of you. You cannot run commands. Anything that touches a repo, GitHub, Linear, a server, a test, a file outside the hub, or any lookup bigger than a glance at your own notes goes to a worker with the Agent tool, in the background (the default). Hand off in one short line ("on it — a reader is checking the PRs"), then stay with the person. Several workers may run at once (one builder per repo). You are never busy: the person can always talk to you while workers run.
+YOU DECIDE, WORKERS EXECUTE — this is the whole point of you. You are the senior; workers are juniors. Every change, build, test, browser run and write outside the hub goes to a worker with the Agent tool, in the background (the default). But you are not blind: you may LOOK yourself with read-only commands (git log/show/diff/status, gh pr view/list/checks/diff, gh run view/list, gh api GET, ls, cat, head, tail, grep, find, curl GET, ps, lsof -i, and a pipe into head/tail/wc/grep/sort/uniq/cut/jq) and open screenshots with Read. Anything that changes something is refused. Use your eyes to read diffs, PR and CI state, logs and screenshots, and to verify what workers say. Hand off in one short line ("on it — a reader is checking the PRs"), then stay with the person. Several workers may run at once (one builder per repo). You are never busy: the person can always talk to you while workers run.
 
-WHEN A WORKER REPORTS BACK: check what it says against what you asked, write the outcome into the mind, and tell the person in one or two lines — at a natural pause, not in the middle of something else they are discussing. If they are mid-topic, finish their topic first.
+EVERY BRIEF IS A SPEC YOU DECIDED. A worker brief you write holds the approach, design and constraints you decided, then ends with a "Done means:" checklist of concrete, checkable outcomes. The worker executes; it does not decide.
+
+CHECK BEFORE DONE — day and night. When a worker finishes, YOU judge the real result yourself against the Done-means checklist: read the diff with git or gh, read the test output, open the screenshots. Never take the worker's report as proof, and never send another cheap worker to do the judging. Pass: it counts, and only then do you tell the person. Fail: one retry whose brief names the gap. Second fail: it goes to needs-you with the evidence. No third loop. Write your verdict in mind/checks/<task-slug>.md (task name lowercased, non-letters and digits turned into dashes): what you checked, against which Done-means lines, the evidence (commit, PR, CI, screenshot paths), and pass or fail. The server keeps the task at "verify" and reminds you until that file is newer than the worker's finish, so never report a task done without it.
+
+WHEN A WORKER REPORTS BACK: judge it as above, write the outcome into the mind, and tell the person in one or two lines — at a natural pause, not in the middle of something else they are discussing. If they are mid-topic, finish their topic first.
 
 CARDS = EVERYTHING RUNNING. The strip is every task the person is working on with you, not only big ones. The moment a task is started or agreed, it gets a card (even before any worker); the moment it closes, merges, is dropped or parked, its card is removed — never wait to be reminded. Each card is one task; the server also adds a card by itself if a worker starts on a [tag] that has none — then fill in its title and project.
 
-LIVE MAIN TASKS FILE. Keep mind/main-tasks.json current — the window draws the person's main tasks from it, live. Shape: [{"name":"<main task, their words — the anchor you tag workers with>","title":"<the MAIN task — the overall goal, in plain product words, at most 6 — e.g. 'Finishing the checkout redesign', 'Moving auth to the new provider'>","now":"<what is being done on it RIGHT NOW, at most 8 words — e.g. 'Fixing the failing payment test'>","project":"<the product/repo in human words, e.g. Checkout, Search>","stage":"plan|build|fix|verify|ready|test|pr|checking|safe|merged","state":"moving|needs-you|blocked|waiting","line":"<at most 12 words: where it is>"}]. Rewrite it the moment any main task changes stage or state. Stages, exactly: plan · build · fix (changes after a review or a test failed) · verify (built; a worker is proving it works) · ready (built and proven — waiting for the person to test) · test (the person is testing) · pr (pushed, PR up) · checking (the merge-safety check is running) · safe (the check passed — safe to merge) · merged. Every time a worker starts or finishes on a main task, re-check that task's stage, state and now-line and rewrite the file in the same turn. When a task is safe, its only remaining step is the person's merge — that is good news, not a problem (the window shows it calm and faded). When it is merged, set stage merged; once the merge is confirmed deployed, remove it from the file (it leaves the strip) and record it in mind/done.md. The card must never say a stage that isn't true right now: if a PR gets new commits, it's back to build or fix, and "safe" is lost until the check passes again. Start every worker's description with the main task in brackets — "[Smart chat] fix the white band" — so the window can show which tasks have workers running.
+LIVE MAIN TASKS FILE. Keep mind/main-tasks.json current — the window draws the person's main tasks from it, live. Shape: [{"name":"<main task, their words — the anchor you tag workers with>","title":"<the MAIN task — the overall goal, in plain product words, at most 6 — e.g. 'Finishing the checkout redesign', 'Moving auth to the new provider'>","now":"<what is being done on it RIGHT NOW, at most 8 words — e.g. 'Fixing the failing payment test'>","project":"<the product/repo in human words, e.g. Checkout, Search>","stage":"plan|build|fix|verify|ready|test|pr|checking|safe|merged","state":"moving|needs-you|blocked|waiting","line":"<at most 12 words: where it is>"}]. Rewrite it the moment any main task changes stage or state. Stages, exactly: plan · build · fix (changes after a review or a test failed) · verify (built; a worker is proving it works) · ready (built and proven — waiting for the person to test) · test (the person is testing) · pr (pushed, PR up) · checking (the merge-safety check is running) · safe (the check passed — safe to merge) · merged. Every time a worker starts or finishes on a main task, re-check that task's stage, state and now-line and rewrite the file in the same turn. When a task is safe, its only remaining step is the person's merge — that is good news, not a problem (the window shows it calm and faded). When it is merged, set stage merged; once the merge is confirmed deployed, remove it from the file (it leaves the strip) and record it in mind/done.md. The card must never say a stage that isn't true right now: if a PR gets new commits, it's back to build or fix, and "safe" is lost until the check passes again. FOCUS AND PENDING — nothing is ever lost when priorities shift. main-tasks.json holds EVERY open task, not just today's: keep the array in priority order (most important first) and give each task "focus": true or false. focus:true = what we are really working on now (the cards; keep it to 3 or fewer). focus:false = pending — still open, waiting its turn (the window lists these in a side list, in your order). When the person shifts priority, move tasks between focus and pending and re-order — never delete a task just because it lost focus; a task leaves the file only when merged/closed or the person drops it (then record it in mind/done.md or decisions.md). Pending tasks keep honest stage/state/line too. LOAD: count open tasks. When the person starts something new while 8 or more are open, say so in one line before planning it ("You have N open — want to close X or Y first?") and name the nearest-to-done ones; when a task is close to done (safe, ready for test, one step left), nudge to finish it before picking up new work. Start every worker's description with the main task in brackets — "[Search] fix the white band" — so the window can show which tasks have workers running.
 
 PERSONA. If mind/persona.md exists it is the person's own persona (written with them, or from a persona they already keep elsewhere): take its voice rules and things to avoid as your voice. Your name stays Sahar. Where the persona and the agreement disagree, the agreement wins.
 
@@ -108,9 +131,18 @@ TIME: every message carries the local date and time in <now>. Use it.
 MODELS — pick the right one for the job, not the cheapest. You keep all judgment on the main model.
 - reader (Haiku): lookups and checks — files, branches, PR/CI status, logs. Cheap, but brief it precisely: exactly what to find, where, and what counts as an answer.
 - builder (Sonnet): routine, well-briefed changes and mechanical GitHub/Linear actions.
-- your own model (Opus, general-purpose worker): design calls, tricky debugging, reviews, the merge-safety check.
+- Opus worker (model: "opus" — say why in the brief): only after a failed retry, or for a security or merge-safety review. A general-purpose worker with no model named is run on Sonnet by the server; never rely on inheriting your own model.
 - expert (Fable): when work is stuck or high-stakes. Stuck = the same feature fails after two rounds of fixes, tests keep failing, a reviewer keeps finding the same kind of problem, or a day passes without real progress. Call the expert BEFORE trying a third round on a weaker model: it starts from the first failing test, finds the root cause (the approach, the skill instructions, or the test itself) and proposes the better fix. Tell the person in one progress line, e.g. "Checkout redesign: stuck after two rounds; asking a Fable expert what's really wrong."
-One short line says which worker and model, and why.`;
+One short line says which worker and model, and why.
+
+NIGHT SHIFT — a <night-shift> note means the person is away and you are working alone.
+- Work the pending list in main-tasks.json in priority order, focus first. Only local, reversible steps: build on a branch or worktree, run tests, reviews, diagnosis, fixing review findings, PR descriptions. Every fence stands exactly as it is: no push, PR, merge, migration or external write, whatever the note says.
+- You may decide a small thing that sits inside an agreed decision in mind/decisions.md (re-read it first) and log it with its reason and how to undo it. Anything else — a product call, a scope change, anything touching or contradicting a decision, a blocker — goes on the "Needs you" list; move on to the next item, never stop on it.
+- The standing rule CHECK BEFORE DONE applies unchanged: you check every finished worker's real result yourself. A second fail is parked on "Needs you" with the evidence.
+- Save every brief and every check result in the night file the note names (mind/night/<YYYY-MM-DD>.md), under Done / Decided alone / Needs you, as you go.
+- Builders are Sonnet and readers Haiku; name the model on every worker.
+- If the note says the night's share is used, stop launching workers and note it. If nothing doable is left, reply exactly: night shift: nothing left. Otherwise reply in one line at most; the person is not reading.
+- On the person's first message after a night shift, open with ONE short briefing — Done / Decided alone (each with reason and how to undo it) / Needs you (with the evidence) — then update the cards and main-tasks.json to match, then answer them.`;
 
 const ROTATION_PROMPT = `<rotation>This hidden conversation is about to rotate; the person will not see this turn. Write into the mind everything from this conversation that is not there yet: rewrite mind/workload.md in place to the current truth; append new decisions with their reasons to mind/decisions.md, new lessons to mind/lessons.md, finished features to mind/done.md, rules the person gave to mind/agreement.md, repo facts to mind/repos/<repo>.md. Then reply with exactly one word: rotated.</rotation>`;
 
@@ -202,12 +234,33 @@ function insideHub(p) {
   const abs = realLocation(p);
   return abs === hub || abs.startsWith(hub + path.sep);
 }
-/** `recentUserText`: a string, or a function returning the person's recent words. */
-export function fenceHook(recentUserText) {
+// A worker launched with no subagent_type is general-purpose and would inherit her Opus;
+// the hook gives it Sonnet unless the brief named a model.
+export function defaultWorkerModel(toolInput) {
+  const t = toolInput?.subagent_type;
+  if (toolInput?.model) return toolInput.model;
+  if (AGENT_MODEL[t]) return AGENT_MODEL[t];
+  return !t || t === 'general-purpose' ? 'sonnet' : '';
+}
+function withModel(input) {
+  if (input.tool_name !== 'Agent' && input.tool_name !== 'Task') return {};
+  const ti = input.tool_input || {};
+  if (ti.model || (ti.subagent_type && ti.subagent_type !== 'general-purpose')) return {};
+  return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow', updatedInput: { ...ti, model: 'sonnet' } } };
+}
+/** `recentUserText`: a string, or a function returning the person's recent words. `nightBlock`: optional, true once the night's share is used. */
+export function fenceHook(recentUserText, nightBlock) {
   const words = () => (typeof recentUserText === 'function' ? recentUserText() : recentUserText);
   return async (input) => {
     const onMainThread = !input.agent_id;
     if (onMainThread) {
+      if (input.tool_name === 'Bash') {
+        const cmd = String(input.tool_input?.command || '');
+        for (const [re, why] of ALWAYS_BLOCKED) if (re.test(cmd)) return deny(why);
+        const ro = readOnlyBash(cmd);
+        if (!ro.ok) return deny(`Sahar's own commands are read-only looks only (${ro.why}) — hand this "Bash" to a worker (Agent tool, in the background)`);
+        return {};
+      }
       if (!MAIN_ALLOWED.has(input.tool_name)) {
         return deny(`Sahar never does the work herself — hand "${input.tool_name}" to a worker (Agent tool, in the background)`);
       }
@@ -217,9 +270,12 @@ export function fenceHook(recentUserText) {
       if ((input.tool_name === 'Agent' || input.tool_name === 'Task') && input.tool_input?.run_in_background === false) {
         return deny('workers run in the background so Sahar stays available — call it again without run_in_background:false');
       }
-      return {};
+      if ((input.tool_name === 'Agent' || input.tool_name === 'Task') && nightBlock?.()) {
+        return deny("the night's share of the budget is used — no new workers until the person is back");
+      }
+      return withModel(input);
     }
-    if (input.tool_name !== 'Bash') return {};
+    if (input.tool_name !== 'Bash') return withModel(input);
     const cmd = String(input.tool_input?.command || '');
     for (const [re, why] of ALWAYS_BLOCKED) if (re.test(cmd)) return deny(why);
     for (const [re, why] of NEEDS_WORD) if (re.test(cmd) && !unlocked(words())) return deny(why);
@@ -280,7 +336,7 @@ function mindBoot() {
 Attached because a hidden conversation is starting. First Contact: ${firstContact}
 
 <setup>
-${setupCheck()}
+${setupCheck(tmConnected)}
 </setup>
 Other mind files to read when needed: mind/ → ${list('mind')}; mind/repos/ → ${list('mind/repos')}; history/ → ${list('history')} (recall only).
 
@@ -324,15 +380,39 @@ function activityLine(toolUse) {
 
 // ── main tasks, live: her file + which tasks have workers running right now ──────
 const TASKS_FILE = path.join(HUB_DIR, 'mind', 'main-tasks.json');
-function mainTasks() {
+const CHECKS_DIR = path.join(HUB_DIR, 'mind', 'checks');
+const CHECKS_FILE = path.join(DATA_DIR, '.checks.json');
+function loadChecks() {
+  try { return JSON.parse(fs.readFileSync(CHECKS_FILE, 'utf8')) || {}; } catch { return {}; }
+}
+/** A worker finished on "[Task] …": the task's result now waits for her own check. */
+function recordWorkerDone(description) {
+  const slug = slugOf(taskOfWorker(description));
+  if (!slug) return;
+  const s = loadChecks();
+  s[slug] = Date.now();
+  try { fs.writeFileSync(CHECKS_FILE, JSON.stringify(s)); } catch {}
+}
+function checkMtime(slug) {
+  try { return fs.statSync(path.join(CHECKS_DIR, `${slug}.md`)).mtimeMs; } catch { return null; }
+}
+function readTasksRaw() {
   let tasks = [];
   try { tasks = JSON.parse(fs.readFileSync(TASKS_FILE, 'utf8')); } catch {}
-  if (!Array.isArray(tasks)) return [];
+  return Array.isArray(tasks) ? tasks : [];
+}
+/** Raw tasks in a done-ish stage that she has not checked herself yet. */
+function uncheckedNow() {
+  return uncheckedTasks(readTasksRaw(), loadChecks(), checkMtime);
+}
+function mainTasks() {
+  const tasks = readTasksRaw();
   const running = [...live.workers.values()].filter((w) => w.shown);
-  return tasks.slice(0, 8).map((t) => {
+  const unchecked = new Set(uncheckedNow().map((t) => slugOf(t.name)));
+  return tasks.slice(0, 40).filter((t) => String(t?.stage) !== 'merged').map((t) => {
     const name = String(t?.name || '').slice(0, 60);
     const tag = `[${name.toLowerCase()}]`;
-    return {
+    return overlayVerify({
       name,
       title: String(t?.title || '').slice(0, 70),
       now: String(t?.now || '').slice(0, 90),
@@ -340,8 +420,9 @@ function mainTasks() {
       stage: String(t?.stage || 'plan'),
       state: String(t?.state || 'waiting'),
       line: String(t?.line || '').slice(0, 140),
+      focus: t?.focus !== false,
       running: running.filter((w) => String(w.task || '').toLowerCase().startsWith(tag)).length,
-    };
+    }, unchecked.has(slugOf(name)));
   });
 }
 /** A worker started on "[Task] …" and that task has no card yet → add it, so nothing runs unseen. */
@@ -369,6 +450,8 @@ function pushTasks(force = false) {
 function watchTasks() {
   fs.mkdirSync(path.dirname(TASKS_FILE), { recursive: true });
   try { fs.watch(path.dirname(TASKS_FILE), (_e, f) => { if (f === 'main-tasks.json') setTimeout(() => pushTasks(), 150); }); } catch {}
+  fs.mkdirSync(CHECKS_DIR, { recursive: true });
+  try { fs.watch(CHECKS_DIR, () => setTimeout(() => pushTasks(), 150)); } catch {}
 }
 
 // ── live clients (Server-Sent Events) ─────────────────────────────────────────
@@ -451,7 +534,7 @@ function startConversation({ resume } = {}) {
       agents: AGENTS,
       permissionMode: 'default',
       canUseTool: async (_name, toolInput) => ({ behavior: 'allow', updatedInput: toolInput }),
-      hooks: { PreToolUse: [{ hooks: [fenceHook(recentUserText)] }] },
+      hooks: { PreToolUse: [{ hooks: [fenceHook(recentUserText, nightCapReached)] }] },
     },
   });
   live.q = q;
@@ -498,6 +581,7 @@ async function consume(q) {
     } else if (m.type === 'system' && m.subtype === 'task_notification') {
       const meta = live.workers.get(m.task_id);
       live.workers.delete(m.task_id);
+      if (meta && meta.shown && !m.ambient && m.status === 'completed') recordWorkerDone(meta.task);
       broadcast({ type: 'workers', count: live.workers.size });
       pushTasks();
       if (meta && meta.shown && !m.ambient) {
@@ -512,12 +596,13 @@ async function consume(q) {
       for (const block of m.message.content) {
         if (block.type === 'text' && block.text.trim()) {
           if (live.rotating) continue;
+          if (night.nightActive) { nightHeard(block.text); continue; }
           say(block.text);
         } else if (block.type === 'tool_use') {
           broadcast({ type: 'status', text: activityLine(block) });
           if (block.name === 'Task' || block.name === 'Agent') {
             const t = block.input?.subagent_type || 'general-purpose';
-            const alias = block.input?.model || AGENT_MODEL[t];
+            const alias = defaultWorkerModel(block.input);
             const meta = {
               agent: t,
               model: alias ? ALIAS_LABEL[alias] || modelLabel(alias) : 'same model',
@@ -535,7 +620,9 @@ async function consume(q) {
         const why = (typeof m.result === 'string' && m.result.trim()) || (m.errors || []).join('; ') || m.subtype;
         console.log(`[turn] failed: ${why}`);
         say(`That didn't go through on my side — ${why}`);
+        nightTurnFailed(why);
       }
+      live.nightTurn = false;
       const mu = m.modelUsage?.[live.mainModel];
       if (mu?.contextWindow) live.windowSize = mu.contextWindow;
       setBusy(false);
@@ -554,7 +641,7 @@ function afterTurn() {
     live.push = null;
     clearState();
     const held = live.heldDuringRotation.splice(0);
-    for (const m of held) deliver(m.text, m.attachments);
+    for (const m of held) deliver(m.text, m.attachments, m.opts);
     return;
   }
   const share = live.windowSize ? live.lastCtx / live.windowSize : 0;
@@ -563,7 +650,9 @@ function afterTurn() {
     console.log(`[rotate] context ${live.lastCtx}/${live.windowSize} — writing down first`);
     live.rotating = true;
     live.push(ROTATION_PROMPT);
+    return;
   }
+  nightCapCheck();
 }
 
 /** A dropped file, resolved safely inside the upload folder — or null. */
@@ -573,17 +662,26 @@ function uploadedFile(name) {
   return safe && fs.existsSync(full) ? { name: safe, full } : null;
 }
 
-function deliver(text, attachments = []) {
+// opts.user: typed by the person (ends a night shift with a briefing). opts.night: the server's own night-shift note.
+function deliver(text, attachments = [], opts = {}) {
   // Never feed a message into a conversation that is being written down and closed —
   // it would be answered inside the hidden rotation turn and the reply lost.
   if (live.rotating) {
-    live.heldDuringRotation.push({ text, attachments });
+    live.heldDuringRotation.push({ text, attachments, opts });
     if (!live.turnActive) setBusy(true);
     return;
   }
-  live.recentWords = [...live.recentWords, text].slice(-3);
+  // A night-shift note must never count as the person's words (it mentions "push" and "PR").
+  if (!opts.night) live.recentWords = [...live.recentWords, text].slice(-3);
   const cards = mainTasks().map((t) => `${t.title || t.name} (${t.stage})`).join(' · ') || 'none';
   let prefix = nowLine() + `\n<cards>Cards now: ${cards}. If this message starts, agrees or names a task with no card, add its card now; if it closes, merges, drops or parks one, remove that card now.</cards>\n`;
+  if (opts.user && night.nightActive) {
+    prefix += `<briefing>The person is back after your night shift. Open mind/night/${nightDate()}.md and any other file in mind/night from this shift, then start your reply with ONE short briefing: Done (checked and passed) / Decided alone (each with its reason and how to undo it) / Needs you (questions and blockers, with the evidence). Update the cards and main-tasks.json to match, then answer their message.</briefing>\n`;
+    night.nightActive = false;
+    night.nightIdle = false;
+    saveNight();
+  }
+  prefix += uncheckedNote(uncheckedNow());
   if (!live.q) {
     const { sessionId } = loadState();
     startConversation({ resume: sessionId });
@@ -607,6 +705,155 @@ function deliver(text, attachments = []) {
   if (!live.turnActive) setBusy(true);
 }
 
+// ── the night shift: her own clock ─────────────────────────────────────────────
+// A heartbeat plus a single wake after a limit resets. When the person has been away for
+// a while she gets ONE hidden instruction turn; nothing here loops while a limit is on.
+const NIGHT_HEARTBEAT_MIN = Number(process.env.NIGHT_HEARTBEAT_MIN || 30);
+const NIGHT_AWAY_MIN = Number(process.env.NIGHT_AWAY_MIN || 45);
+const NIGHT_AFTER_RESET_MS = 3 * 60 * 1000;
+const NIGHT_MAX_UNITS = Number(process.env.NIGHT_MAX_UNITS || 30); // flat per-night cap, in estimated units (night.mjs)
+const NIGHT_WEEKLY_BUDGET_UNITS = process.env.NIGHT_WEEKLY_BUDGET_UNITS ? Number(process.env.NIGHT_WEEKLY_BUDGET_UNITS) : NaN;
+const NIGHT_WEEK = { dow: Number(process.env.NIGHT_WEEK_RESET_DOW ?? 2), hour: Number(process.env.NIGHT_WEEK_RESET_HOUR ?? 1) };
+const NIGHT_FILE = path.join(DATA_DIR, '.night.json');
+const NIGHT_LOGS = process.env.NIGHT_LOGS_DIR || path.join(os.homedir(), '.claude', 'projects', HUB_DIR.replace(/[^A-Za-z0-9]/g, '-'));
+const meter = createUsageMeter(NIGHT_LOGS);
+const night = (() => {
+  let s = {};
+  try { s = JSON.parse(fs.readFileSync(NIGHT_FILE, 'utf8')); } catch {}
+  if (!s.lastUserAt) {
+    const last = loadThread().filter((e) => e.kind === 'user').pop();
+    s.lastUserAt = last?.t || 0;
+  }
+  return { limitedUntil: 0, lastWakeAt: 0, nightActive: false, nightStartedAt: 0, nightIdle: false, capNoted: false, ...s };
+})();
+let nextHeartbeatAt = 0;
+let limitTimer = null;
+function saveNight() {
+  try { fs.writeFileSync(NIGHT_FILE, JSON.stringify(night)); } catch {}
+}
+function touchUser() {
+  night.lastUserAt = Date.now();
+  night.nightIdle = false;
+  saveNight();
+}
+function nightDate() {
+  const d = new Date(night.nightStartedAt || Date.now());
+  const z = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+}
+// ESTIMATE only: spend is summed from her own session logs with rough price weights; the real
+// remaining allowance is not readable anywhere.
+function nightCap(now = Date.now()) {
+  const week = weekWindow(now, NIGHT_WEEK);
+  return {
+    ...capMath({
+      budget: NIGHT_WEEKLY_BUDGET_UNITS,
+      usedThisWeek: Number.isFinite(NIGHT_WEEKLY_BUDGET_UNITS) ? meter.unitsSince(week.start, now) : 0,
+      now, nextReset: week.next, maxUnits: NIGHT_MAX_UNITS,
+      nightSpent: night.nightActive && night.nightStartedAt ? meter.unitsSince(night.nightStartedAt, now) : 0,
+    }),
+    weekResetAt: week.next,
+  };
+}
+function nightCapReached() {
+  return night.nightActive && !nightCap().ok;
+}
+function nightHeard(text) {
+  if (/night shift:\s*nothing left/i.test(text)) { night.nightIdle = true; saveNight(); }
+  try {
+    fs.mkdirSync(path.join(HUB_DIR, 'mind', 'night'), { recursive: true });
+    fs.appendFileSync(path.join(HUB_DIR, 'mind', 'night', `${nightDate()}.talk.md`), `- ${new Date().toTimeString().slice(0, 5)} ${String(text).replace(/\s+/g, ' ').trim().slice(0, 400)}\n`);
+  } catch {}
+}
+function scheduleLimitWake() {
+  clearTimeout(limitTimer);
+  limitTimer = null;
+  const wait = night.limitedUntil - Date.now();
+  if (wait <= 0) return;
+  limitTimer = setTimeout(() => (Date.now() >= night.limitedUntil ? nightTick('limit-reset') : scheduleLimitWake()), Math.min(wait + 500, 2 ** 31 - 1));
+}
+/** A failed turn: a limit message sets ONE wake just after its reset; any other failure of a night turn backs off an hour. */
+function nightTurnFailed(why) {
+  const now = Date.now();
+  if (looksLikeLimit(why)) {
+    const reset = parseResetTime(why, now);
+    night.limitedUntil = reset ? reset + NIGHT_AFTER_RESET_MS : now + 60 * 60 * 1000;
+    console.log(`[night] limit hit — no wakes until ${new Date(night.limitedUntil).toISOString()}${reset ? '' : ' (no reset time in the message; 1h fallback)'}`);
+  } else if (live.nightTurn) {
+    night.limitedUntil = now + 60 * 60 * 1000;
+    console.log('[night] a night turn failed — backing off 1h');
+  } else return;
+  saveNight();
+  scheduleLimitWake();
+}
+function nightInstruction(cap) {
+  const f = `mind/night/${nightDate()}.md`;
+  return `${nowLine()}
+<night-shift>The person has been away for ${NIGHT_AWAY_MIN}+ minutes. Run the night shift per your rules (hub CLAUDE.md "Night shift"): work the pending list in main-tasks.json in priority order, focus first; local, reversible steps only; every fence unchanged; small calls only inside an agreed decision in mind/decisions.md, logged with reason and undo; everything else to "Needs you". Every worker brief has a "Done means:" checklist and you check the real result yourself against it (one retry, then park). Save every brief and check result in ${f} (${HUB_DIR}/${f}). Estimated night spend so far ${cap.spent.toFixed(1)} of ${cap.cap.toFixed(1)} units. If nothing doable is left, reply exactly: night shift: nothing left.</night-shift>`;
+}
+/** Heartbeat and limit-reset wakes both come through here. */
+function nightTick(source) {
+  const now = Date.now();
+  if (source === 'heartbeat') nextHeartbeatAt = now + NIGHT_HEARTBEAT_MIN * 60000;
+  if (night.limitedUntil && now >= night.limitedUntil) { night.limitedUntil = 0; saveNight(); }
+  const cap = nightCap(now);
+  const d = wakeDecision({
+    now, away: isAway({ now, lastUserAt: night.lastUserAt, awayMs: NIGHT_AWAY_MIN * 60000 }),
+    limitedUntil: night.limitedUntil, turnActive: live.turnActive, rotating: live.rotating,
+    workers: live.workers.size, nightIdle: night.nightIdle, capOk: cap.ok,
+  });
+  console.log(`[night] ${source}: ${d.wake ? 'waking her' : d.reason}`);
+  if (!d.wake) return d;
+  if (!night.nightActive) {
+    Object.assign(night, { nightActive: true, nightStartedAt: now, nightIdle: false, capNoted: false });
+    try { fs.mkdirSync(path.join(HUB_DIR, 'mind', 'night'), { recursive: true }); } catch {}
+  }
+  night.lastWakeAt = now;
+  saveNight();
+  live.nightTurn = true;
+  deliver(nightInstruction(nightCap(now)), [], { night: true });
+  return d;
+}
+/** After each turn of a night shift: once the night's share is used, tell her once to stop and note it. */
+function nightCapCheck() {
+  if (!night.nightActive || night.capNoted || live.rotating) return;
+  const cap = nightCap();
+  if (cap.ok) return;
+  night.capNoted = true;
+  night.nightIdle = true;
+  saveNight();
+  console.log(`[night] share used (${cap.spent.toFixed(1)}/${cap.cap.toFixed(1)} units) — telling her to stop`);
+  live.nightTurn = true;
+  deliver(`${nowLine()}\n<night-shift>The night's share of the budget is used (about ${cap.spent.toFixed(1)} of ${cap.cap.toFixed(1)} estimated units). Launch no new workers. Let running ones finish, add a line to mind/night/${nightDate()}.md saying the cap stopped the shift and what is still pending, then reply exactly: night shift: nothing left.</night-shift>`, [], { night: true });
+}
+function nightStatus() {
+  const now = Date.now();
+  const cap = nightCap(now);
+  return {
+    now: new Date(now).toISOString(),
+    away: isAway({ now, lastUserAt: night.lastUserAt, awayMs: NIGHT_AWAY_MIN * 60000 }),
+    awayAfterMin: NIGHT_AWAY_MIN,
+    lastUserAt: night.lastUserAt ? new Date(night.lastUserAt).toISOString() : null,
+    limitedUntil: night.limitedUntil > now ? new Date(night.limitedUntil).toISOString() : null,
+    nextWake: night.limitedUntil > now ? new Date(night.limitedUntil).toISOString() : (nextHeartbeatAt ? new Date(nextHeartbeatAt).toISOString() : null),
+    nextWakeKind: night.limitedUntil > now ? 'limit-reset' : 'heartbeat',
+    lastWakeAt: night.lastWakeAt ? new Date(night.lastWakeAt).toISOString() : null,
+    nightActive: night.nightActive,
+    nightIdle: night.nightIdle,
+    spend: { estimate: true, nightUnits: Number(cap.spent.toFixed(2)), capUnits: Number(cap.cap.toFixed(2)), weeklyBudgetUnits: Number.isFinite(NIGHT_WEEKLY_BUDGET_UNITS) ? NIGHT_WEEKLY_BUDGET_UNITS : null, weeklyRemainingUnits: cap.remaining, weekResetsAt: new Date(cap.weekResetAt).toISOString() },
+    caffeinate: process.env.NIGHT_CAFFEINATE === '1',
+  };
+}
+function startNight() {
+  scheduleLimitWake();
+  nextHeartbeatAt = Date.now() + NIGHT_HEARTBEAT_MIN * 60000;
+  setInterval(() => nightTick('heartbeat'), NIGHT_HEARTBEAT_MIN * 60000);
+  if (process.env.NIGHT_CAFFEINATE === '1') {
+    // keeps the Mac from idle-sleeping for as long as this process lives; changes no system setting
+    try { spawn('caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore' }).on('error', () => {}); } catch {}
+  }
+}
+
 async function readBody(req) {
   const chunks = [];
   for await (const c of req) chunks.push(c);
@@ -619,7 +866,7 @@ const server = http.createServer(async (req, res) => {
     res.end(fs.readFileSync(path.join(UI_DIR, 'public', 'index.html')));
   } else if (req.method === 'GET' && req.url === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-    res.write(`data: ${JSON.stringify({ type: 'hello', busy: live.turnActive, workers: live.workers.size, model: modelLabel(live.mainModel), tasks: mainTasks() })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'hello', busy: live.turnActive, workers: live.workers.size, model: modelLabel(live.mainModel || MAIN_MODEL), modelId: MAIN_MODEL, models: MODEL_CHOICES.map((id) => ({ id, label: modelLabel(id) })), tasks: mainTasks() })}\n\n`);
     clients.add(res);
     const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 20000);
     req.on('close', () => { clearInterval(ping); clients.delete(res); });
@@ -656,10 +903,23 @@ const server = http.createServer(async (req, res) => {
     if (!hidden) {
       const item = appendThread({ kind: 'user', text, attachments });
       broadcast({ type: 'user', ...item });
+      touchUser();
     }
-    deliver(text, attachments);
+    deliver(text, attachments, { user: !hidden });
     res.writeHead(202, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
+  } else if (req.method === 'POST' && req.url === '/model') {
+    let model = '';
+    try { ({ model = '' } = JSON.parse(await readBody(req))); } catch {}
+    if (!MODEL_CHOICES.includes(model)) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unknown model' })); return; }
+    MAIN_MODEL = model;
+    try { fs.writeFileSync(MODEL_FILE, model); } catch {}
+    if (live.q) { try { await live.q.setModel(model); } catch (err) { console.log(`[model] switch failed: ${err?.message}`); } }
+    live.mainModel = model;
+    console.log(`[model] now ${model}`);
+    broadcast({ type: 'model', model: modelLabel(model), id: model });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, model }));
   } else if (req.method === 'POST' && req.url === '/stop') {
     // Stops what she is saying or doing right now; background workers keep going.
     if (live.q && live.turnActive) {
@@ -676,6 +936,36 @@ const server = http.createServer(async (req, res) => {
   } else if (req.method === 'GET' && req.url === '/thread') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(loadThread()));
+  } else if (req.method === 'GET' && req.url === '/night') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(nightStatus()));
+  } else if (req.method === 'POST' && req.url === '/tm/connect') {
+    let email = '', password = '';
+    try { ({ email = '', password = '' } = JSON.parse(await readBody(req))); } catch {}
+    email = String(email).trim(); password = String(password);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    if (!email || !password) { res.end(JSON.stringify({ ok: false, error: 'Enter your TrueMemory email and password.' })); return; }
+    try {
+      const { user } = await tm.connect(email, password);
+      tmConnected = true;
+      res.end(JSON.stringify({ ok: true, user }));
+    } catch (err) {
+      res.end(JSON.stringify({ ok: false, error: tm.friendlyError(err) }));
+    }
+  } else if (req.method === 'POST' && req.url === '/tm/set-password') {
+    let email = '';
+    try { ({ email = '' } = JSON.parse(await readBody(req))); } catch {}
+    email = String(email).trim();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    if (!email) { res.end(JSON.stringify({ ok: false, error: 'Enter your TrueMemory email first.' })); return; }
+    try { await tm.sendSetPasswordEmail(email); res.end(JSON.stringify({ ok: true })); }
+    catch (err) { res.end(JSON.stringify({ ok: false, error: tm.friendlyError(err) })); }
+  } else if (req.method === 'GET' && req.url === '/tm/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    try { res.end(JSON.stringify(await tm.status())); } catch (err) { res.end(JSON.stringify({ connected: false, error: tm.friendlyError(err) })); }
+  } else if (req.method === 'POST' && req.url === '/tm/proof') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    try { res.end(JSON.stringify(await tm.runProof())); } catch (err) { res.end(JSON.stringify({ passed: false, steps: [{ step: 'proof', ok: false, error: tm.friendlyError(err) }] })); }
   } else if (req.method === 'GET' && req.url === '/health') {
     const s = loadState();
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -689,6 +979,8 @@ const server = http.createServer(async (req, res) => {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   ensureHub();
   watchTasks();
+  startNight();
+  refreshTmSetup();
   server.listen(PORT, '127.0.0.1', () => {
     console.log(`Sahar on http://localhost:${PORT} — hub: ${HUB_DIR} — ${MAIN_MODEL} — never busy, workers in the background — rotate at ${Math.round(ROTATE_AT * 100)}% or ${ROTATE_TOKENS} tokens`);
   });

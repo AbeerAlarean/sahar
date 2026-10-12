@@ -9,7 +9,7 @@
 <!-- Deadline first. Exactly what you have to do. -->
 
 ## In progress
-<!-- One block per feature, max 6 lines:
+<!-- One block per feature, at most 6 lines:
      **<feature, plain words>** — <repo> — <stage>
      <the one next thing> · waiting on <who>
      <branch> · <worktree> · <PR #> · <deploy state> -->
